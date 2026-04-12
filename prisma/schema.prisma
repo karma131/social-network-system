@@ -16,8 +16,23 @@ model User {
   email     String   @unique
   password  String
   fullName  String
+
+  avatar    String?
+  cover     String?
+  bio       String?
+
+  role      String   @default("user")
+  status    String   @default("active")
+
+  posts     Post[]
+  comments  Comment[]
+
+  followers Follow[] @relation("followers")
+  following Follow[] @relation("following")
+
   createdAt DateTime @default(now())
 }
+
 model Post {
   id        String   @id @default(uuid())
   content   String
@@ -38,6 +53,41 @@ model Comment {
 
   author    User     @relation(fields: [authorId], references: [id])
   post      Post     @relation(fields: [postId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Reaction {
+  id        String   @id @default(uuid())
+  userId    String
+  postId    String
+  type      String   @default("like")
+
+  user      User     @relation(fields: [userId], references: [id])
+  post      Post     @relation(fields: [postId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Follow {
+  id           String @id @default(uuid())
+  followerId   String
+  followingId  String
+
+  follower     User @relation("following", fields: [followerId], references: [id])
+  following    User @relation("followers", fields: [followingId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  message   String
+  isRead    Boolean  @default(false)
+
+  user      User     @relation(fields: [userId], references: [id])
 
   createdAt DateTime @default(now())
 }
