@@ -1,148 +1,148 @@
-generator client {
-  provider = "prisma-client-js"
-}
+    generator client {
+      provider = "prisma-client-js"
+    }
 
-datasource db {
-  provider = "postgresql"
-}
+    datasource db {
+      provider = "postgresql"
+    }
 
-enum Role {
-  USER
-  ADMIN
-}
+    enum Role {
+      USER
+      ADMIN
+    }
 
-enum UserStatus {
-  ACTIVE
-  BLOCKED
-}
+    enum UserStatus {
+      ACTIVE
+      BLOCKED
+    }
 
-enum ReactionType {
-  LIKE
-  LOVE
-  HAHA
-  WOW
-  SAD
-  ANGRY
-}
+    enum ReactionType {
+      LIKE
+      LOVE
+      HAHA
+      WOW
+      SAD
+      ANGRY
+    }
 
-enum NotificationType {
-  LIKE
-  COMMENT
-  FOLLOW
-}
+    enum NotificationType {
+      LIKE
+      COMMENT
+      FOLLOW
+    }
 
-model User {
-  id                Int                 @id @default(autoincrement())
-  fullName          String
-  email             String              @unique
-  password          String
-  avatar            String?
-  cover             String?
-  bio               String?
-  role              Role                @default(USER)
-  status            UserStatus          @default(ACTIVE)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+    model User {
+      id                Int                 @id @default(autoincrement())
+      fullName          String
+      email             String              @unique
+      password          String
+      avatar            String?
+      cover             String?
+      bio               String?
+      role              Role                @default(USER)
+      status            UserStatus          @default(ACTIVE)
+      createdAt         DateTime            @default(now())
+      updatedAt         DateTime            @updatedAt
 
-  posts             Post[]
-  comments          Comment[]
-  reactions         Reaction[]
-  following         Follow[]            @relation("Following")
-  followers         Follow[]            @relation("Followers")
-  notifications     Notification[]
-  conversationUsers ConversationUser[]
-  messages          Message[]
-}
+      posts             Post[]
+      comments          Comment[]
+      reactions         Reaction[]
+      following         Follow[]            @relation("Following")
+      followers         Follow[]            @relation("Followers")
+      notifications     Notification[]
+      conversationUsers ConversationUser[]
+      messages          Message[]
+    }
 
-model Post {
-  id         Int        @id @default(autoincrement())
-  content    String
-  imageUrl   String?
-  authorId   Int
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+    model Post {
+      id         Int        @id @default(autoincrement())
+      content    String
+      imageUrl   String?
+      authorId   Int
+      createdAt  DateTime   @default(now())
+      updatedAt  DateTime   @updatedAt
 
-  author     User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  comments   Comment[]
-  reactions  Reaction[]
-}
+      author     User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+      comments   Comment[]
+      reactions  Reaction[]
+    }
 
-model Comment {
-  id         Int        @id @default(autoincrement())
-  content    String
-  userId     Int
-  postId     Int
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+    model Comment {
+      id         Int        @id @default(autoincrement())
+      content    String
+      userId     Int
+      postId     Int
+      createdAt  DateTime   @default(now())
+      updatedAt  DateTime   @updatedAt
 
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post       Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
-}
+      user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+      post       Post       @relation(fields: [postId], references: [id], onDelete: Cascade)
+    }
 
-model Reaction {
-  id         Int          @id @default(autoincrement())
-  type       ReactionType @default(LIKE)
-  userId     Int
-  postId     Int
-  createdAt  DateTime     @default(now())
+    model Reaction {
+      id         Int          @id @default(autoincrement())
+      type       ReactionType @default(LIKE)
+      userId     Int
+      postId     Int
+      createdAt  DateTime     @default(now())
 
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post       Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
+      user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+      post       Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, postId])
-}
+      @@unique([userId, postId])
+    }
 
-model Follow {
-  id           Int       @id @default(autoincrement())
-  followerId   Int
-  followingId  Int
-  createdAt    DateTime  @default(now())
+    model Follow {
+      id           Int       @id @default(autoincrement())
+      followerId   Int
+      followingId  Int
+      createdAt    DateTime  @default(now())
 
-  follower     User      @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
-  following    User      @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+      follower     User      @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+      following    User      @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
 
-  @@unique([followerId, followingId])
-}
+      @@unique([followerId, followingId])
+    }
 
-model Notification {
-  id         Int               @id @default(autoincrement())
-  userId     Int
-  type       NotificationType
-  message    String
-  isRead     Boolean           @default(false)
-  createdAt  DateTime          @default(now())
+    model Notification {
+      id         Int               @id @default(autoincrement())
+      userId     Int
+      type       NotificationType
+      message    String
+      isRead     Boolean           @default(false)
+      createdAt  DateTime          @default(now())
 
-  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
+      user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+    }
 
-model Conversation {
-  id           Int                @id @default(autoincrement())
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+    model Conversation {
+      id           Int                @id @default(autoincrement())
+      createdAt    DateTime           @default(now())
+      updatedAt    DateTime           @updatedAt
 
-  participants ConversationUser[]
-  messages     Message[]
-}
+      participants ConversationUser[]
+      messages     Message[]
+    }
 
-model ConversationUser {
-  id             Int           @id @default(autoincrement())
-  conversationId Int
-  userId         Int
-  createdAt      DateTime      @default(now())
+    model ConversationUser {
+      id             Int           @id @default(autoincrement())
+      conversationId Int
+      userId         Int
+      createdAt      DateTime      @default(now())
 
-  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+      conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+      user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([conversationId, userId])
-}
+      @@unique([conversationId, userId])
+    }
 
-model Message {
-  id             Int           @id @default(autoincrement())
-  conversationId Int
-  senderId       Int
-  content        String
-  createdAt      DateTime      @default(now())
+    model Message {
+      id             Int           @id @default(autoincrement())
+      conversationId Int
+      senderId       Int
+      content        String
+      createdAt      DateTime      @default(now())
 
-  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
-}
+      conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+      sender         User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+    }
