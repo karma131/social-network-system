@@ -12,7 +12,11 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { UseGuards } from '@nestjs/common';
 
+import { RolesGuard } from './guards/roles.guard';
+
+import { Roles } from './decorators/roles.decorator';
 // Nếu sau này bạn có guard thật thì bỏ comment:
 // import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
