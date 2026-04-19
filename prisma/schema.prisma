@@ -11,83 +11,419 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  fullName  String
+  id                BigInt      @id @default(autoincrement())
+  fullName          String      @map("full_name") @db.VarChar(100)
+  email             String      @unique @db.VarChar(255)
+  passwordHash      String      @map("password_hash")
+  avatarUrl         String?     @map("avatar_url")
+  coverUrl          String?     @map("cover_url")
+  bio               String?
+  role              UserRole    @default(USER)
+  status            UserStatus  @default(ACTIVE)
+  emailVerifiedAt   DateTime?   @map("email_verified_at")
+  lastLoginAt       DateTime?   @map("last_login_at")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+  deletedAt         DateTime?   @map("deleted_at")
 
-  avatar    String?
-  cover     String?
-  bio       String?
+  refreshTokens                 RefreshToken[]
+  uploads                       Upload[]
+  posts                         Post[]
+  comments                      Comment[]
+  reactions                     Reaction[]
 
-  role      String   @default("user")
-  status    String   @default("active")
+  followers                     Follow[] @relation("UserFollowers")
+  following                     Follow[] @relation("UserFollowing")
+  notificationsReceived         Notification[] @relation("NotificationUser")
+  notificationsActed            Notification[] @relation("NotificationActor")
 
-  posts     Post[]
-  comments  Comment[]
+  createdConversations          Conversation[] @relation("ConversationCreatedBy")
+  conversationParticipants      ConversationParticipant[]
+  sentMessages                  Message[] @relation("MessageSender")
+  messageReads                  MessageRead[]
 
-  followers Follow[] @relation("followers")
-  following Follow[] @relation("following")
+  adminLogs                     AdminLog[]
 
-  createdAt DateTime @default(now())
+  passwordResetTokens           PasswordResetToken[]
+  emailVerificationTokens       EmailVerificationToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         BigInt    @id @default(autoincrement())
+  userId     BigInt    @map("user_id")
+  tokenHash  String    @map("token_hash")
+  userAgent  String?   @map("user_agent")
+  ipAddress  String?   @map("ip_address") @db.VarChar(64)
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model Upload {
+  id         BigInt     @id @default(autoincrement())
+  userId     BigInt     @map("user_id")
+  fileUrl    String     @map("file_url")
+  fileName   String?    @map("file_name") @db.VarChar(255)
+  mimeType   String?    @map("mime_type") @db.VarChar(100)
+  fileSize   BigInt?    @map("file_size")
+  uploadType UploadType @default(OTHER) @map("upload_type")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postMedia          PostMedia[]
+  messageAttachments MessageAttachment[]
+
+  @@index([userId])
+  @@index([uploadType])
+  @@map("uploads")
 }
 
 model Post {
-  id        String   @id @default(uuid())
-  content   String
-  authorId  String
+  id            BigInt         @id @default(autoincrement())
+  userId        BigInt         @map("user_id")
+  content       String?
+  visibility    PostVisibility @default(PUBLIC)
+  status        PostStatus     @default(PUBLISHED)
+  commentCount  Int            @default(0) @map("comment_count")
+  reactionCount Int            @default(0) @map("reaction_count")
+  shareCount    Int            @default(0) @map("share_count")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  deletedAt     DateTime?      @map("deleted_at")
 
-  author    User     @relation(fields: [authorId], references: [id])
-  comments  Comment[]
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media         PostMedia[]
+  comments      Comment[]
+  reactions     Reaction[]
+  notifications Notification[]
 
-  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@index([status, createdAt(sort: Desc)])
+  @@index([visibility])
+  @@map("posts")
+}
+
+model PostMedia {
+  id         BigInt    @id @default(autoincrement())
+  postId     BigInt    @map("post_id")
+  uploadId   BigInt?   @map("upload_id")
+  fileUrl    String    @map("file_url")
+  fileType   String    @default("image") @map("file_type") @db.VarChar(20)
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  post       Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  upload     Upload?   @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+
+  @@index([postId])
+  @@map("post_media")
 }
 
 model Comment {
-  id        String   @id @default(uuid())
-  content   String
+  id            BigInt         @id @default(autoincrement())
+  postId         BigInt         @map("post_id")
+  userId         BigInt         @map("user_id")
+  parentId       BigInt?        @map("parent_id")
+  content        String
+  status         CommentStatus  @default(ACTIVE)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  deletedAt      DateTime?      @map("deleted_at")
 
-  authorId  String
-  postId    String
+  post           Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent         Comment?       @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies        Comment[]      @relation("CommentReplies")
+  notifications  Notification[]
 
-  author    User     @relation(fields: [authorId], references: [id])
-  post      Post     @relation(fields: [postId], references: [id])
-
-  createdAt DateTime @default(now())
+  @@index([postId])
+  @@index([userId])
+  @@index([parentId])
+  @@index([postId, createdAt])
+  @@map("comments")
 }
 
 model Reaction {
-  id        String   @id @default(uuid())
-  userId    String
-  postId    String
-  type      String   @default("like")
+  id         BigInt        @id @default(autoincrement())
+  userId     BigInt        @map("user_id")
+  postId     BigInt        @map("post_id")
+  type       ReactionType
+  createdAt  DateTime      @default(now()) @map("created_at")
 
-  user      User     @relation(fields: [userId], references: [id])
-  post      Post     @relation(fields: [postId], references: [id])
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post       Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
+  @@unique([userId, postId])
+  @@index([postId])
+  @@index([userId])
+  @@index([type])
+  @@map("reactions")
 }
 
 model Follow {
-  id           String @id @default(uuid())
-  followerId   String
-  followingId  String
+  id           BigInt    @id @default(autoincrement())
+  followerId   BigInt    @map("follower_id")
+  followingId  BigInt    @map("following_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
-  follower     User @relation("following", fields: [followerId], references: [id])
-  following    User @relation("followers", fields: [followingId], references: [id])
+  follower     User      @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
+  following    User      @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
 }
 
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  type      String
-  message   String
-  isRead    Boolean  @default(false)
+  id               BigInt            @id @default(autoincrement())
+  userId           BigInt            @map("user_id")
+  actorId          BigInt?           @map("actor_id")
+  type             NotificationType
+  postId           BigInt?           @map("post_id")
+  commentId        BigInt?           @map("comment_id")
+  messageId        BigInt?           @map("message_id")
+  contentSnapshot  String?           @map("content_snapshot")
+  isRead           Boolean           @default(false) @map("is_read")
+  readAt           DateTime?         @map("read_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
 
-  user      User     @relation(fields: [userId], references: [id])
+  user             User              @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor            User?             @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  post             Post?             @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment          Comment?          @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  message          Message?          @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+model Conversation {
+  id               BigInt                     @id @default(autoincrement())
+  type             ConversationType           @default(DIRECT)
+  title            String?                    @db.VarChar(255)
+  createdById      BigInt?                    @map("created_by")
+  lastMessageId    BigInt?                    @unique @map("last_message_id")
+  createdAt        DateTime                   @default(now()) @map("created_at")
+  updatedAt        DateTime                   @updatedAt @map("updated_at")
+
+  createdBy        User?                      @relation("ConversationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  lastMessage      Message?                   @relation("ConversationLastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
+  participants     ConversationParticipant[]
+  messages         Message[]                  @relation("ConversationMessages")
+
+  @@index([type])
+  @@index([updatedAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id                 BigInt        @id @default(autoincrement())
+  conversationId     BigInt        @map("conversation_id")
+  userId             BigInt        @map("user_id")
+  joinedAt           DateTime      @default(now()) @map("joined_at")
+  leftAt             DateTime?     @map("left_at")
+  isAdmin            Boolean       @default(false) @map("is_admin")
+  lastReadMessageId  BigInt?       @unique @map("last_read_message_id")
+
+  conversation       Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage    Message?      @relation("ParticipantLastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id                       BigInt                     @id @default(autoincrement())
+  conversationId           BigInt                     @map("conversation_id")
+  senderId                 BigInt?                    @map("sender_id")
+  type                     MessageType                @default(TEXT)
+  content                  String?
+  replyToMessageId         BigInt?                    @map("reply_to_message_id")
+  status                   MessageStatus              @default(SENT)
+  createdAt                DateTime                   @default(now()) @map("created_at")
+  updatedAt                DateTime                   @updatedAt @map("updated_at")
+  deletedAt                DateTime?                  @map("deleted_at")
+
+  conversation             Conversation               @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
+  sender                   User?                      @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  replyToMessage           Message?                   @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies                  Message[]                  @relation("MessageReplies")
+
+  attachments              MessageAttachment[]
+  reads                    MessageRead[]
+  notifications            Notification[]
+
+  conversationLastMessage  Conversation?              @relation("ConversationLastMessage")
+  participantLastReadFor   ConversationParticipant[]  @relation("ParticipantLastReadMessage")
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id         BigInt    @id @default(autoincrement())
+  messageId   BigInt    @map("message_id")
+  uploadId    BigInt?   @map("upload_id")
+  fileUrl     String    @map("file_url")
+  fileName    String?   @map("file_name") @db.VarChar(255)
+  mimeType    String?   @map("mime_type") @db.VarChar(100)
+  fileSize    BigInt?   @map("file_size")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  upload      Upload?   @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+
+  @@index([messageId])
+  @@map("message_attachments")
+}
+
+model MessageRead {
+  id         BigInt    @id @default(autoincrement())
+  messageId   BigInt    @map("message_id")
+  userId      BigInt    @map("user_id")
+  readAt      DateTime  @default(now()) @map("read_at")
+
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@index([messageId])
+  @@map("message_reads")
+}
+
+model AdminLog {
+  id         BigInt    @id @default(autoincrement())
+  adminId    BigInt    @map("admin_id")
+  action     String    @db.VarChar(100)
+  targetType String    @map("target_type") @db.VarChar(50)
+  targetId   BigInt    @map("target_id")
+  reason     String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  admin      User      @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([targetType, targetId])
+  @@map("admin_logs")
+}
+
+model PasswordResetToken {
+  id         BigInt    @id @default(autoincrement())
+  userId     BigInt    @map("user_id")
+  tokenHash  String    @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id         BigInt    @id @default(autoincrement())
+  userId     BigInt    @map("user_id")
+  tokenHash  String    @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification_tokens")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+  BANNED
+}
+
+enum PostVisibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+enum PostStatus {
+  PUBLISHED
+  HIDDEN
+  DELETED
+}
+
+enum CommentStatus {
+  ACTIVE
+  HIDDEN
+  DELETED
+}
+
+enum ReactionType {
+  LIKE
+  LOVE
+  HAHA
+  WOW
+  SAD
+  ANGRY
+}
+
+enum NotificationType {
+  LIKE_POST
+  COMMENT_POST
+  FOLLOW_USER
+  MESSAGE
+}
+
+enum UploadType {
+  AVATAR
+  COVER
+  POST_IMAGE
+  CHAT_IMAGE
+  OTHER
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  SEEN
+  DELETED
 }
