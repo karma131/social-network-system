@@ -8,25 +8,23 @@ import {
 } from '@nestjs/common';
 
 import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { UseGuards } from '@nestjs/common';
 
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 
 import { Roles } from './decorators/roles.decorator';
-// Nếu sau này bạn có guard thật thì bỏ comment:
-// import { JwtAuthGuard } from './guards/jwt-auth.guard';
+
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @Controller('auth')
 export class AuthController {
+
   constructor(
     private readonly authService: AuthService
   ) {}
 
-  // POST /auth/register
   @Post('register')
   async register(
     @Body() registerDto: RegisterDto
@@ -34,7 +32,6 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
-  // POST /auth/login
   @Post('login')
   async login(
     @Body() loginDto: LoginDto
@@ -42,7 +39,6 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
-  // POST /auth/refresh
   @Post('refresh')
   async refreshToken(
     @Body() refreshDto: RefreshTokenDto
@@ -50,7 +46,6 @@ export class AuthController {
     return this.authService.refreshToken(refreshDto);
   }
 
-  // POST /auth/logout
   @Post('logout')
   async logout(
     @Body() refreshDto: RefreshTokenDto
@@ -58,15 +53,21 @@ export class AuthController {
     return this.authService.logout(refreshDto);
   }
 
-  // GET /auth/me
-  // Khi có JwtAuthGuard thật thì mở UseGuards ra
-  // @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('me')
   async getCurrentUser(
     @Req() req: any
   ) {
-    return this.authService.getCurrentUser(
-      req.user
-    );
+    return this.authService.getCurrentUser(req.user);
   }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @Get('admin')
+  adminOnly() {
+    return {
+      message: 'Admin access granted'
+    };
+  }
+
 }
