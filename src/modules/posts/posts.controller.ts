@@ -1,0 +1,70 @@
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post as HttpPost,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreatePostDto } from './dto/create-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
+import { PostsService } from './posts.service';
+
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
+
+@ApiTags('Posts')
+@Controller('posts')
+export class PostsController {
+  constructor(private readonly postsService: PostsService) {}
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Tạo bài viết mới' })
+  @HttpPost()
+  createPost(@Req() req: RequestCoUser, @Body() dto: CreatePostDto) {
+    return this.postsService.createPost(req.user.sub, dto);
+  }
+
+  @ApiOperation({ summary: 'Lấy danh sách bài viết public' })
+  @Get()
+  getPublicPosts() {
+    return this.postsService.getPublicPosts();
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy danh sách bài viết của tôi' })
+  @Get('me')
+  getMyPosts(@Req() req: RequestCoUser) {
+    return this.postsService.getMyPosts(req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Lấy chi tiết một bài viết' })
+  @Get(':id')
+  getPostById(@Param('id') id: string) {
+    return this.postsService.getPostById(id);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Cập nhật bài viết' })
+  @Patch(':id')
+  updatePost(
+    @Param('id') id: string,
+    @Req() req: RequestCoUser,
+    @Body() dto: UpdatePostDto,
+  ) {
+    return this.postsService.updatePost(id, req.user.sub, dto);
+  }
+}

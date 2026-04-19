@@ -1,10 +1,29 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { AdminModule } from './modules/admin/admin.module';
+import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
+import { PostsModule } from './modules/posts/posts.module';
+import { CommentsModule } from './modules/comments/comments.module';
+import { ReactionsModule } from './modules/reactions/reactions.module';
+import { FollowsModule } from './modules/follows/follows.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { FeedsModule } from './modules/feeds/feeds.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
+import { ChatsModule } from './modules/chats/chats.module';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    AdminModule,
+    AuthModule,
+    UsersModule,
+    PostsModule,
+    CommentsModule,
+    ReactionsModule,
+    FollowsModule,
+    NotificationsModule,
+    FeedsModule,
+    UploadsModule,
+    ChatsModule,
+  ],
 })
 export class AppModule {}
