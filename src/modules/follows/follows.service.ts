@@ -4,115 +4,149 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { FollowUserDto } from './dto/follow-user.dto';
 
 @Injectable()
 export class FollowsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async followUser(currentUserId: number, targetUserId: number) {
-    if (currentUserId === targetUserId) {
-      throw new BadRequestException('You cannot follow yourself');
+  async followUser(currentUserId: string, dto: FollowUserDto) {
+    const followerId = BigInt(currentUserId);
+    const followingId = BigInt(dto.followingId);
+
+    if (followerId === followingId) {
+      throw new BadRequestException('Bạn không thể tự theo dõi chính mình');
     }
 
-    const targetUser = await this.prisma.user.findUnique({
-      where: { id: targetUserId },
+    const targetUser = await this.prisma.user.findFirst({
+      where: {
+        id: followingId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+      },
     });
 
     if (!targetUser) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy người dùng cần theo dõi');
     }
 
     const existingFollow = await this.prisma.follow.findUnique({
       where: {
         followerId_followingId: {
-          followerId: currentUserId,
-          followingId: targetUserId,
+          followerId,
+          followingId,
         },
       },
     });
 
     if (existingFollow) {
-      throw new BadRequestException('You already followed this user');
+      throw new BadRequestException('Bạn đã theo dõi người dùng này rồi');
     }
 
     const follow = await this.prisma.follow.create({
       data: {
-        followerId: currentUserId,
-        followingId: targetUserId,
+        followerId,
+        followingId,
       },
-      include: {
-        follower: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            avatar: true,
-          },
-        },
+      select: {
+        id: true,
+        followerId: true,
+        followingId: true,
+        createdAt: true,
         following: {
           select: {
             id: true,
             fullName: true,
             email: true,
-            avatar: true,
+            avatarUrl: true,
           },
         },
       },
     });
 
     return {
-      message: 'Follow user successful',
-      follow,
+      message: 'Theo dõi người dùng thành công',
+      follow: {
+        ...follow,
+        id: follow.id.toString(),
+        followerId: follow.followerId.toString(),
+        followingId: follow.followingId.toString(),
+        following: {
+          ...follow.following,
+          id: follow.following.id.toString(),
+        },
+      },
     };
   }
 
-  async unfollowUser(currentUserId: number, targetUserId: number) {
+  async unfollowUser(currentUserId: string, targetUserId: string) {
+    const followerId = BigInt(currentUserId);
+    const followingId = BigInt(targetUserId);
+
     const existingFollow = await this.prisma.follow.findUnique({
       where: {
         followerId_followingId: {
-          followerId: currentUserId,
-          followingId: targetUserId,
+          followerId,
+          followingId,
         },
       },
     });
 
     if (!existingFollow) {
-      throw new BadRequestException('Follow relationship not found');
+      throw new NotFoundException('Bạn chưa theo dõi người dùng này');
     }
 
     await this.prisma.follow.delete({
       where: {
         followerId_followingId: {
-          followerId: currentUserId,
-          followingId: targetUserId,
+          followerId,
+          followingId,
         },
       },
     });
 
     return {
-      message: 'Unfollow user successful',
+      message: 'Bỏ theo dõi thành công',
     };
   }
 
-  async getFollowers(userId: number) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+  async getFollowers(userId: string) {
+    const targetUserId = BigInt(userId);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: targetUserId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy người dùng');
     }
 
     const followers = await this.prisma.follow.findMany({
-      where: { followingId: userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
+      where: {
+        followingId: targetUserId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        createdAt: true,
         follower: {
           select: {
             id: true,
             fullName: true,
             email: true,
-            avatar: true,
+            avatarUrl: true,
             bio: true,
           },
         },
@@ -120,30 +154,51 @@ export class FollowsService {
     });
 
     return {
-      message: 'Get followers successful',
-      followers,
+      message: 'Lấy danh sách follower thành công',
+      followers: followers.map((item) => ({
+        id: item.id.toString(),
+        createdAt: item.createdAt,
+        user: {
+          ...item.follower,
+          id: item.follower.id.toString(),
+        },
+      })),
     };
   }
 
-  async getFollowing(userId: number) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+  async getFollowing(userId: string) {
+    const targetUserId = BigInt(userId);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: targetUserId,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Không tìm thấy người dùng');
     }
 
     const following = await this.prisma.follow.findMany({
-      where: { followerId: userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
+      where: {
+        followerId: targetUserId,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        createdAt: true,
         following: {
           select: {
             id: true,
             fullName: true,
             email: true,
-            avatar: true,
+            avatarUrl: true,
             bio: true,
           },
         },
@@ -151,8 +206,37 @@ export class FollowsService {
     });
 
     return {
-      message: 'Get following successful',
-      following,
+      message: 'Lấy danh sách đang theo dõi thành công',
+      following: following.map((item) => ({
+        id: item.id.toString(),
+        createdAt: item.createdAt,
+        user: {
+          ...item.following,
+          id: item.following.id.toString(),
+        },
+      })),
+    };
+  }
+
+  async checkFollow(currentUserId: string, targetUserId: string) {
+    const followerId = BigInt(currentUserId);
+    const followingId = BigInt(targetUserId);
+
+    const existingFollow = await this.prisma.follow.findUnique({
+      where: {
+        followerId_followingId: {
+          followerId,
+          followingId,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return {
+      message: 'Kiểm tra trạng thái theo dõi thành công',
+      isFollowing: !!existingFollow,
     };
   }
 }

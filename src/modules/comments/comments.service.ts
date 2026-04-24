@@ -1,140 +1,247 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { CommentStatus, PostStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 
 @Injectable()
 export class CommentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async createComment(userId: number, data: CreateCommentDto) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: data.postId },
+  async createComment(userId: string, dto: CreateCommentDto) {
+    if (!dto.content.trim()) {
+      throw new BadRequestException('Nội dung bình luận không được để trống');
+    }
+
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: BigInt(dto.postId),
+        deletedAt: null,
+        status: PostStatus.PUBLISHED,
+      },
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException('Không tìm thấy bài viết');
+    }
+
+    if (dto.parentId) {
+      const parentComment = await this.prisma.comment.findFirst({
+        where: {
+          id: BigInt(dto.parentId),
+          deletedAt: null,
+        },
+      });
+
+      if (!parentComment) {
+        throw new NotFoundException('Không tìm thấy bình luận cha');
+      }
     }
 
     const comment = await this.prisma.comment.create({
       data: {
-        content: data.content,
-        userId,
-        postId: data.postId,
+        postId: BigInt(dto.postId),
+        userId: BigInt(userId),
+        parentId: dto.parentId ? BigInt(dto.parentId) : null,
+        content: dto.content.trim(),
+        status: CommentStatus.ACTIVE,
       },
-      include: {
+      select: {
+        id: true,
+        postId: true,
+        userId: true,
+        parentId: true,
+        content: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
         user: {
           select: {
             id: true,
             fullName: true,
-            email: true,
-            avatar: true,
-          },
-        },
-        post: {
-          select: {
-            id: true,
-            content: true,
+            avatarUrl: true,
           },
         },
       },
     });
 
+    await this.prisma.post.update({
+      where: {
+        id: BigInt(dto.postId),
+      },
+      data: {
+        commentCount: {
+          increment: 1,
+        },
+      },
+    });
+
     return {
-      message: 'Create comment successful',
-      comment,
+      message: 'Tạo bình luận thành công',
+      comment: {
+        ...comment,
+        id: comment.id.toString(),
+        postId: comment.postId.toString(),
+        userId: comment.userId.toString(),
+        parentId: comment.parentId ? comment.parentId.toString() : null,
+        user: {
+          ...comment.user,
+          id: comment.user.id.toString(),
+        },
+      },
     };
   }
 
-  async getCommentsByPostId(postId: number) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
+  async getCommentsByPost(postId: string) {
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: BigInt(postId),
+        deletedAt: null,
+      },
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException('Không tìm thấy bài viết');
     }
 
     const comments = await this.prisma.comment.findMany({
-      where: { postId },
-      orderBy: { createdAt: 'desc' },
-      include: {
+      where: {
+        postId: BigInt(postId),
+        deletedAt: null,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+      select: {
+        id: true,
+        postId: true,
+        userId: true,
+        parentId: true,
+        content: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
         user: {
           select: {
             id: true,
             fullName: true,
-            email: true,
-            avatar: true,
+            avatarUrl: true,
           },
         },
       },
     });
 
     return {
-      message: 'Get comments successful',
-      comments,
+      message: 'Lấy danh sách bình luận thành công',
+      comments: comments.map((comment) => ({
+        ...comment,
+        id: comment.id.toString(),
+        postId: comment.postId.toString(),
+        userId: comment.userId.toString(),
+        parentId: comment.parentId ? comment.parentId.toString() : null,
+        user: {
+          ...comment.user,
+          id: comment.user.id.toString(),
+        },
+      })),
     };
   }
 
-  async updateComment(userId: number, commentId: number, data: UpdateCommentDto) {
-    const existingComment = await this.prisma.comment.findUnique({
-      where: { id: commentId },
+  async updateComment(commentId: string, userId: string, dto: UpdateCommentDto) {
+    const comment = await this.prisma.comment.findUnique({
+      where: {
+        id: BigInt(commentId),
+      },
     });
 
-    if (!existingComment) {
-      throw new NotFoundException('Comment not found');
+    if (!comment || comment.deletedAt) {
+      throw new NotFoundException('Không tìm thấy bình luận');
     }
 
-    if (existingComment.userId !== userId) {
-      throw new ForbiddenException('You can only update your own comment');
+    if (comment.userId !== BigInt(userId)) {
+      throw new ForbiddenException('Bạn không có quyền sửa bình luận này');
     }
 
-    const comment = await this.prisma.comment.update({
-      where: { id: commentId },
+    if (dto.content !== undefined && !dto.content.trim()) {
+      throw new BadRequestException('Nội dung bình luận không được để trống');
+    }
+
+    const updatedComment = await this.prisma.comment.update({
+      where: {
+        id: BigInt(commentId),
+      },
       data: {
-        content: data.content,
+        content: dto.content !== undefined ? dto.content.trim() : undefined,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            avatar: true,
-          },
+      select: {
+        id: true,
+        postId: true,
+        userId: true,
+        parentId: true,
+        content: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      message: 'Cập nhật bình luận thành công',
+      comment: {
+        ...updatedComment,
+        id: updatedComment.id.toString(),
+        postId: updatedComment.postId.toString(),
+        userId: updatedComment.userId.toString(),
+        parentId: updatedComment.parentId
+          ? updatedComment.parentId.toString()
+          : null,
+      },
+    };
+  }
+
+  async deleteComment(commentId: string, userId: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: {
+        id: BigInt(commentId),
+      },
+    });
+
+    if (!comment || comment.deletedAt) {
+      throw new NotFoundException('Không tìm thấy bình luận');
+    }
+
+    if (comment.userId !== BigInt(userId)) {
+      throw new ForbiddenException('Bạn không có quyền xóa bình luận này');
+    }
+
+    await this.prisma.comment.update({
+      where: {
+        id: BigInt(commentId),
+      },
+      data: {
+        deletedAt: new Date(),
+        status: CommentStatus.DELETED,
+      },
+    });
+
+    await this.prisma.post.update({
+      where: {
+        id: comment.postId,
+      },
+      data: {
+        commentCount: {
+          decrement: 1,
         },
       },
     });
 
     return {
-      message: 'Update comment successful',
-      comment,
-    };
-  }
-
-  async deleteComment(userId: number, commentId: number) {
-    const existingComment = await this.prisma.comment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!existingComment) {
-      throw new NotFoundException('Comment not found');
-    }
-
-    if (existingComment.userId !== userId) {
-      throw new ForbiddenException('You can only delete your own comment');
-    }
-
-    await this.prisma.comment.delete({
-      where: { id: commentId },
-    });
-
-    return {
-      message: 'Delete comment successful',
+      message: 'Xóa bình luận thành công',
     };
   }
 }

@@ -1,14 +1,22 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { PostVisibility } from '@prisma/client';
 
 export class CreatePostDto {
-  @ApiProperty({ example: 'Bai viet dau tien cua toi' })
-  @IsString()
-  @IsNotEmpty()
-  content: string;
-
-  @ApiPropertyOptional({ example: 'https://example.com/post-image.jpg' })
+  @ApiPropertyOptional({
+    example: 'Xin chào mọi người, đây là bài viết đầu tiên của tôi.',
+    description: 'Nội dung bài viết',
+  })
   @IsOptional()
   @IsString()
-  imageUrl?: string;
+  @MaxLength(5000)
+  content?: string;
+
+  @ApiProperty({
+    enum: PostVisibility,
+    example: 'PUBLIC', // 👈 sửa chỗ này
+    description: 'Quyền riêng tư của bài viết',
+  })
+  @IsEnum(PostVisibility)
+  visibility!: PostVisibility;
 }

@@ -1,24 +1,28 @@
-import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { GetMyFeedDto } from './dto/get-my-feed.dto';
 import { FeedsService } from './feeds.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
 
 @ApiTags('Feeds')
+@ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard)
 @Controller('feeds')
 export class FeedsController {
   constructor(private readonly feedsService: FeedsService) {}
 
+  @ApiOperation({ summary: 'Lấy bảng tin của tôi' })
   @Get('me')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy newsfeed của người dùng đang đăng nhập' })
-  @ApiResponse({ status: 200, description: 'Lấy newsfeed thành công' })
-  getMyFeed(@Req() req: any) {
-    return this.feedsService.getMyFeed(req.user.id);
+  getMyFeed(@Req() req: RequestCoUser, @Query() query: GetMyFeedDto) {
+    return this.feedsService.getMyFeed(req.user.sub, query);
   }
 }

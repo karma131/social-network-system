@@ -3,57 +3,95 @@ import {
   Controller,
   Get,
   Param,
-  ParseIntPipe,
+  Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ChatsService } from './chats.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateConversationDto } from './dto/create-conversation.dto';
+import { CreateDirectConversationDto } from './dto/create-direct-conversation.dto';
+import { CreateGroupConversationDto } from './dto/create-group-conversation.dto';
+import { GetMessagesDto } from './dto/get-messages.dto';
 import { SendMessageDto } from './dto/send-message.dto';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
 
 @ApiTags('Chats')
-@Controller('chats')
+@ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
+@Controller('chats')
 export class ChatsController {
   constructor(private readonly chatsService: ChatsService) {}
 
-  @Post('conversations')
-  @ApiOperation({ summary: 'Tạo cuộc trò chuyện' })
-  @ApiResponse({ status: 201, description: 'Tạo cuộc trò chuyện thành công' })
-  createConversation(@Req() req: any, @Body() body: CreateConversationDto) {
-    return this.chatsService.createConversation(req.user.id, body);
-  }
-
-  @Post('messages')
-  @ApiOperation({ summary: 'Gửi tin nhắn' })
-  @ApiResponse({ status: 201, description: 'Gửi tin nhắn thành công' })
-  sendMessage(@Req() req: any, @Body() body: SendMessageDto) {
-    return this.chatsService.sendMessage(req.user.id, body);
-  }
-
-  @Get('conversations')
-  @ApiOperation({ summary: 'Lấy danh sách cuộc trò chuyện' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách cuộc trò chuyện thành công' })
-  getMyConversations(@Req() req: any) {
-    return this.chatsService.getMyConversations(req.user.id);
-  }
-
-  @Get('messages/:conversationId')
-  @ApiOperation({ summary: 'Lấy danh sách tin nhắn' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách tin nhắn thành công' })
-  getMessages(
-    @Req() req: any,
-    @Param('conversationId', ParseIntPipe) conversationId: number,
+  @ApiOperation({ summary: 'Tạo cuộc trò chuyện riêng 1-1' })
+  @Post('direct')
+  createDirectConversation(
+    @Req() req: RequestCoUser,
+    @Body() dto: CreateDirectConversationDto,
   ) {
-    return this.chatsService.getMessages(req.user.id, conversationId);
+    return this.chatsService.createDirectConversation(req.user.sub, dto);
+  }
+
+  @ApiOperation({ summary: 'Tạo nhóm chat' })
+  @Post('group')
+  createGroupConversation(
+    @Req() req: RequestCoUser,
+    @Body() dto: CreateGroupConversationDto,
+  ) {
+    return this.chatsService.createGroupConversation(req.user.sub, dto);
+  }
+
+  @ApiOperation({ summary: 'Lấy danh sách cuộc trò chuyện của tôi' })
+  @Get()
+  getMyConversations(@Req() req: RequestCoUser) {
+    return this.chatsService.getMyConversations(req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Lấy chi tiết một cuộc trò chuyện' })
+  @Get(':conversationId')
+  getConversationById(
+    @Param('conversationId') conversationId: string,
+    @Req() req: RequestCoUser,
+  ) {
+    return this.chatsService.getConversationById(conversationId, req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Gửi tin nhắn text' })
+  @Post(':conversationId/messages')
+  sendMessage(
+    @Param('conversationId') conversationId: string,
+    @Req() req: RequestCoUser,
+    @Body() dto: SendMessageDto,
+  ) {
+    return this.chatsService.sendMessage(conversationId, req.user.sub, dto);
+  }
+
+  @ApiOperation({ summary: 'Lấy danh sách tin nhắn của cuộc trò chuyện' })
+  @Get(':conversationId/messages')
+  getMessages(
+    @Param('conversationId') conversationId: string,
+    @Req() req: RequestCoUser,
+    @Query() query: GetMessagesDto,
+  ) {
+    return this.chatsService.getMessages(conversationId, req.user.sub, query);
+  }
+
+  @ApiOperation({ summary: 'Đánh dấu cuộc trò chuyện đã đọc' })
+  @Patch(':conversationId/read')
+  markConversationAsRead(
+    @Param('conversationId') conversationId: string,
+    @Req() req: RequestCoUser,
+  ) {
+    return this.chatsService.markConversationAsRead(conversationId, req.user.sub);
   }
 }

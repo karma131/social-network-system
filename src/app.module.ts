@@ -11,31 +11,24 @@ import { CommentsModule } from './modules/comments/comments.module';
 import { ReactionsModule } from './modules/reactions/reactions.module';
 import { FollowsModule } from './modules/follows/follows.module';
 import { FeedsModule } from './modules/feeds/feeds.module';
-import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ChatsModule } from './modules/chats/chats.module';
 
 @Module({
   imports: [
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'uploads'),
-      serveRoot: '/uploads',
-    }),
-    PrismaModule,
+    AdminModule,
     AuthModule,
     UsersModule,
     PostsModule,
     CommentsModule,
     ReactionsModule,
     FollowsModule,
-    FeedsModule,
     NotificationsModule,
-    AdminModule,
+    FeedsModule,
     UploadsModule,
     ChatsModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

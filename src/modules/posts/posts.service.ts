@@ -1,143 +1,232 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PostStatus, PostVisibility } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 
 @Injectable()
 export class PostsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async createPost(userId: number, data: CreatePostDto) {
+  async createPost(userId: string, dto: CreatePostDto) {
+    if (!dto.content?.trim()) {
+      throw new BadRequestException('Nội dung bài viết không được để trống');
+    }
+
     const post = await this.prisma.post.create({
       data: {
-        content: data.content,
-        imageUrl: data.imageUrl,
-        authorId: userId,
+        userId: BigInt(userId),
+        content: dto.content.trim(),
+        visibility: dto.visibility,
+        status: PostStatus.PUBLISHED,
       },
-      include: {
-        author: {
+      select: {
+        id: true,
+        content: true,
+        visibility: true,
+        status: true,
+        commentCount: true,
+        reactionCount: true,
+        shareCount: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
           select: {
             id: true,
             fullName: true,
             email: true,
-            avatar: true,
+            avatarUrl: true,
           },
         },
       },
     });
 
     return {
-      message: 'Create post successful',
-      post,
+      message: 'Tạo bài viết thành công',
+      post: {
+        ...post,
+        id: post.id.toString(),
+        user: {
+          ...post.user,
+          id: post.user.id.toString(),
+        },
+      },
     };
   }
 
-  async getAllPosts() {
+  async getPublicPosts() {
     const posts = await this.prisma.post.findMany({
-      orderBy: { createdAt: 'desc' },
-      include: {
-        author: {
+      where: {
+        status: PostStatus.PUBLISHED,
+        visibility: PostVisibility.PUBLIC,
+        deletedAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        content: true,
+        visibility: true,
+        status: true,
+        commentCount: true,
+        reactionCount: true,
+        shareCount: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
           select: {
             id: true,
             fullName: true,
-            email: true,
-            avatar: true,
+            avatarUrl: true,
           },
         },
       },
     });
 
     return {
-      message: 'Get posts successful',
-      posts,
+      message: 'Lấy danh sách bài viết thành công',
+      posts: posts.map((post) => ({
+        ...post,
+        id: post.id.toString(),
+        user: {
+          ...post.user,
+          id: post.user.id.toString(),
+        },
+      })),
     };
   }
 
-  async getPostById(id: number) {
-    const post = await this.prisma.post.findUnique({
-      where: { id },
-      include: {
-        author: {
+  async getMyPosts(userId: string) {
+    const posts = await this.prisma.post.findMany({
+      where: {
+        userId: BigInt(userId),
+        deletedAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        content: true,
+        visibility: true,
+        status: true,
+        commentCount: true,
+        reactionCount: true,
+        shareCount: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return {
+      message: 'Lấy bài viết của tôi thành công',
+      posts: posts.map((post) => ({
+        ...post,
+        id: post.id.toString(),
+      })),
+    };
+  }
+
+  async getPostById(postId: string) {
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: BigInt(postId),
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        content: true,
+        visibility: true,
+        status: true,
+        commentCount: true,
+        reactionCount: true,
+        shareCount: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
           select: {
             id: true,
             fullName: true,
-            email: true,
-            avatar: true,
+            avatarUrl: true,
+            bio: true,
           },
         },
       },
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException('Không tìm thấy bài viết');
     }
 
     return {
-      message: 'Get post successful',
-      post,
-    };
-  }
-
-  async updatePost(userId: number, postId: number, data: UpdatePostDto) {
-    const existingPost = await this.prisma.post.findUnique({
-      where: { id: postId },
-    });
-
-    if (!existingPost) {
-      throw new NotFoundException('Post not found');
-    }
-
-    if (existingPost.authorId !== userId) {
-      throw new ForbiddenException('You can only update your own post');
-    }
-
-    const post = await this.prisma.post.update({
-      where: { id: postId },
-      data: {
-        content: data.content,
-        imageUrl: data.imageUrl,
-      },
-      include: {
-        author: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-            avatar: true,
-          },
+      message: 'Lấy chi tiết bài viết thành công',
+      post: {
+        ...post,
+        id: post.id.toString(),
+        user: {
+          ...post.user,
+          id: post.user.id.toString(),
         },
       },
-    });
-
-    return {
-      message: 'Update post successful',
-      post,
     };
   }
 
-  async deletePost(userId: number, postId: number) {
-    const existingPost = await this.prisma.post.findUnique({
-      where: { id: postId },
+  async updatePost(postId: string, userId: string, dto: UpdatePostDto) {
+    const post = await this.prisma.post.findUnique({
+      where: {
+        id: BigInt(postId),
+      },
     });
 
-    if (!existingPost) {
-      throw new NotFoundException('Post not found');
+    if (!post || post.deletedAt) {
+      throw new NotFoundException('Không tìm thấy bài viết');
     }
 
-    if (existingPost.authorId !== userId) {
-      throw new ForbiddenException('You can only delete your own post');
+    if (post.userId !== BigInt(userId)) {
+      throw new ForbiddenException('Bạn không có quyền sửa bài viết này');
     }
 
-    await this.prisma.post.delete({
-      where: { id: postId },
+    if (
+      dto.content !== undefined &&
+      typeof dto.content === 'string' &&
+      !dto.content.trim()
+    ) {
+      throw new BadRequestException('Nội dung bài viết không được để trống');
+    }
+
+    const updatedPost = await this.prisma.post.update({
+      where: {
+        id: BigInt(postId),
+      },
+      data: {
+        content: dto.content !== undefined ? dto.content.trim() : undefined,
+        visibility: dto.visibility,
+      },
+      select: {
+        id: true,
+        content: true,
+        visibility: true,
+        status: true,
+        commentCount: true,
+        reactionCount: true,
+        shareCount: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     return {
-      message: 'Delete post successful',
+      message: 'Cập nhật bài viết thành công',
+      post: {
+        ...updatedPost,
+        id: updatedPost.id.toString(),
+      },
     };
   }
 }

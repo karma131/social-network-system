@@ -4,48 +4,48 @@ import {
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ReactPostDto } from './dto/react-post.dto';
 import { ReactionsService } from './reactions.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateReactionDto } from './dto/create-reaction.dto';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
 
 @ApiTags('Reactions')
 @Controller('reactions')
 export class ReactionsController {
   constructor(private readonly reactionsService: ReactionsService) {}
 
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Thả cảm xúc cho bài viết' })
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Thả cảm xúc vào bài viết' })
-  @ApiResponse({ status: 201, description: 'Thả cảm xúc thành công' })
-  reactToPost(@Req() req: any, @Body() body: CreateReactionDto) {
-    return this.reactionsService.reactToPost(req.user.id, body);
+  reactToPost(@Req() req: RequestCoUser, @Body() dto: ReactPostDto) {
+    return this.reactionsService.reactToPost(req.user.sub, dto);
   }
 
-  @Delete(':postId')
+  @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Bỏ cảm xúc khỏi bài viết' })
-  @ApiResponse({ status: 200, description: 'Bỏ cảm xúc thành công' })
-  removeReaction(@Req() req: any, @Param('postId', ParseIntPipe) postId: number) {
-    return this.reactionsService.removeReaction(req.user.id, postId);
+  @Delete('post/:postId')
+  removeReaction(@Req() req: RequestCoUser, @Param('postId') postId: string) {
+    return this.reactionsService.removeReaction(req.user.sub, postId);
   }
 
-  @Get('post/:postId/count')
-  @ApiOperation({ summary: 'Đếm số lượng tương tác theo bài viết' })
-  @ApiResponse({ status: 200, description: 'Đếm tương tác thành công' })
-  countReactions(@Param('postId', ParseIntPipe) postId: number) {
-    return this.reactionsService.countReactions(postId);
+  @ApiOperation({ summary: 'Lấy danh sách cảm xúc của một bài viết' })
+  @Get('post/:postId')
+  getReactionsByPost(@Param('postId') postId: string) {
+    return this.reactionsService.getReactionsByPost(postId);
   }
 }

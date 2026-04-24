@@ -1,40 +1,45 @@
 import {
   Controller,
+  Delete,
+  Get,
+  Param,
   Post,
+  Req,
   UploadedFile,
+  UploadedFiles,
+  UseGuards,
   UseInterceptors,
+  Body,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { UploadsService } from './uploads.service';
 import {
+  ApiBearerAuth,
   ApiBody,
   ApiConsumes,
   ApiOperation,
-  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UploadType } from '@prisma/client';
+import { UploadsService } from './uploads.service';
 
-function createMulterOptions(folder: string) {
-  return {
-    storage: diskStorage({
-      destination: `./uploads/${folder}`,
-      filename: (req, file, callback) => {
-        const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${extname(file.originalname)}`;
-        callback(null, uniqueName);
-      },
-    }),
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
   };
-}
+};
 
 @ApiTags('Uploads')
+@ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard)
 @Controller('uploads')
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
-  @Post('avatar')
-  @ApiOperation({ summary: 'Upload ảnh avatar' })
+  @ApiOperation({ summary: 'Tải lên một file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -44,64 +49,72 @@ export class UploadsController {
           type: 'string',
           format: 'binary',
         },
+        uploadType: {
+          type: 'string',
+          enum: ['AVATAR', 'COVER', 'POST_IMAGE', 'CHAT_IMAGE', 'OTHER'],
+          example: 'OTHER',
+        },
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Upload avatar thành công' })
-  @UseInterceptors(FileInterceptor('file', createMulterOptions('avatars')))
-  uploadAvatar(@UploadedFile() file: Express.Multer.File) {
-    return {
-      message: 'Upload avatar successful',
-      fileName: file.filename,
-      url: this.uploadsService.getFileUrl('avatars', file.filename),
-    };
+  @Post('single')
+  @UseInterceptors(FileInterceptor('file'))
+  uploadSingle(
+    @Req() req: RequestCoUser,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('uploadType') uploadType?: UploadType,
+  ) {
+    return this.uploadsService.saveFile(
+      req.user.sub,
+      file,
+      uploadType || UploadType.OTHER,
+    );
   }
 
-  @Post('cover')
-  @ApiOperation({ summary: 'Upload ảnh bìa' })
+  @ApiOperation({ summary: 'Tải lên nhiều file' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        file: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+        uploadType: {
           type: 'string',
-          format: 'binary',
+          enum: ['AVATAR', 'COVER', 'POST_IMAGE', 'CHAT_IMAGE', 'OTHER'],
+          example: 'POST_IMAGE',
         },
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'Upload cover thành công' })
-  @UseInterceptors(FileInterceptor('file', createMulterOptions('covers')))
-  uploadCover(@UploadedFile() file: Express.Multer.File) {
-    return {
-      message: 'Upload cover successful',
-      fileName: file.filename,
-      url: this.uploadsService.getFileUrl('covers', file.filename),
-    };
+  @Post('multiple')
+  @UseInterceptors(FilesInterceptor('files', 10))
+  uploadMultiple(
+    @Req() req: RequestCoUser,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body('uploadType') uploadType?: UploadType,
+  ) {
+    return this.uploadsService.saveManyFiles(
+      req.user.sub,
+      files,
+      uploadType || UploadType.OTHER,
+    );
   }
 
-  @Post('post-image')
-  @ApiOperation({ summary: 'Upload ảnh bài viết' })
-  @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 201, description: 'Upload ảnh bài viết thành công' })
-  @UseInterceptors(FileInterceptor('file', createMulterOptions('posts')))
-  uploadPostImage(@UploadedFile() file: Express.Multer.File) {
-    return {
-      message: 'Upload post image successful',
-      fileName: file.filename,
-      url: this.uploadsService.getFileUrl('posts', file.filename),
-    };
+  @ApiOperation({ summary: 'Lấy danh sách file của tôi' })
+  @Get('me')
+  getMyUploads(@Req() req: RequestCoUser) {
+    return this.uploadsService.getMyUploads(req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Xóa file của tôi' })
+  @Delete(':id')
+  deleteUpload(@Req() req: RequestCoUser, @Param('id') id: string) {
+    return this.uploadsService.deleteUpload(req.user.sub, id);
   }
 }

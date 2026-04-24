@@ -1,43 +1,45 @@
-import {
-  Controller,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Patch, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { NotificationsService } from './notifications.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
 
 @ApiTags('Notifications')
+@ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard)
 @Controller('notifications')
 export class NotificationsController {
-  constructor(
-    private readonly notificationsService: NotificationsService,
-  ) {}
+  constructor(private readonly notificationsService: NotificationsService) {}
 
-  @Get()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Lấy danh sách thông báo của tôi' })
-  @ApiResponse({ status: 200, description: 'Lấy thông báo thành công' })
-  getMyNotifications(@Req() req: any) {
-    return this.notificationsService.getMyNotifications(req.user.id);
+  @Get()
+  getMyNotifications(@Req() req: RequestCoUser) {
+    return this.notificationsService.getMyNotifications(req.user.sub);
   }
 
+  @ApiOperation({ summary: 'Lấy số lượng thông báo chưa đọc' })
+  @Get('unread-count')
+  getUnreadCount(@Req() req: RequestCoUser) {
+    return this.notificationsService.getUnreadCount(req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Đánh dấu một thông báo đã đọc' })
   @Patch(':id/read')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Đánh dấu thông báo đã đọc' })
-  @ApiResponse({ status: 200, description: 'Đánh dấu đã đọc thành công' })
-  markAsRead(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
-    return this.notificationsService.markAsRead(req.user.id, id);
+  markAsRead(@Param('id') id: string, @Req() req: RequestCoUser) {
+    return this.notificationsService.markAsRead(id, req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Đánh dấu tất cả thông báo đã đọc' })
+  @Patch('read-all')
+  markAllAsRead(@Req() req: RequestCoUser) {
+    return this.notificationsService.markAllAsRead(req.user.sub);
   }
 }

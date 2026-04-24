@@ -1,50 +1,41 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Req,
-  UseGuards,
-} from '@nestjs/common';
-import { UsersService } from './users.service';
-import { JwtAuthGuard } from '../../modules/auth/guards/jwt-auth.guard';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { Body, Controller, Get, Patch, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UsersService } from './users.service';
+
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
 
 @ApiTags('Users')
+@ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @ApiOperation({ summary: 'Lấy thông tin tài khoản hiện tại' })
   @Get('me')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lấy thông tin cá nhân' })
-  @ApiResponse({ status: 200, description: 'Lấy thông tin thành công' })
-  getMe(@Req() req: any) {
-    return this.usersService.getMe(req.user.id);
+  getMyProfile(@Req() req: RequestCoUser) {
+    return this.usersService.getMyProfile(req.user.sub);
   }
 
+  @ApiOperation({ summary: 'Cập nhật hồ sơ tài khoản hiện tại' })
   @Patch('me')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Cập nhật thông tin cá nhân' })
-  @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
-  updateMe(@Req() req: any, @Body() body: UpdateUserDto) {
-    return this.usersService.updateMe(req.user.id, body);
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Lấy thông tin user theo id' })
-  @ApiResponse({ status: 200, description: 'Lấy thông tin thành công' })
-  getUserById(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.getUserById(id);
+  updateMyProfile(
+    @Req() req: RequestCoUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateMyProfile(req.user.sub, dto);
   }
 }

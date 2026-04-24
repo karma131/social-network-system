@@ -1,69 +1,70 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
-  Post,
+  Post as HttpPost,
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { PostsService } from './posts.service';
-import { JwtAuthGuard } from '../../modules/auth/guards/jwt-auth.guard';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { PostsService } from './posts.service';
+
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
 
 @ApiTags('Posts')
 @Controller('posts')
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
-  @Post()
+  @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Tạo bài viết' })
-  @ApiResponse({ status: 201, description: 'Tạo bài viết thành công' })
-  createPost(@Req() req: any, @Body() body: CreatePostDto) {
-    return this.postsService.createPost(req.user.id, body);
+  @ApiOperation({ summary: 'Tạo bài viết mới' })
+  @HttpPost()
+  createPost(@Req() req: RequestCoUser, @Body() dto: CreatePostDto) {
+    return this.postsService.createPost(req.user.sub, dto);
   }
 
+  @ApiOperation({ summary: 'Lấy danh sách bài viết public' })
   @Get()
-  @ApiOperation({ summary: 'Lấy danh sách bài viết' })
-  getAllPosts() {
-    return this.postsService.getAllPosts();
+  getPublicPosts() {
+    return this.postsService.getPublicPosts();
   }
 
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lấy danh sách bài viết của tôi' })
+  @Get('me')
+  getMyPosts(@Req() req: RequestCoUser) {
+    return this.postsService.getMyPosts(req.user.sub);
+  }
+
+  @ApiOperation({ summary: 'Lấy chi tiết một bài viết' })
   @Get(':id')
-  @ApiOperation({ summary: 'Lấy chi tiết bài viết' })
-  getPostById(@Param('id', ParseIntPipe) id: number) {
+  getPostById(@Param('id') id: string) {
     return this.postsService.getPostById(id);
   }
 
-  @Patch(':id')
+  @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Cập nhật bài viết' })
+  @Patch(':id')
   updatePost(
-    @Req() req: any,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdatePostDto,
+    @Param('id') id: string,
+    @Req() req: RequestCoUser,
+    @Body() dto: UpdatePostDto,
   ) {
-    return this.postsService.updatePost(req.user.id, id, body);
-  }
-
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Xóa bài viết' })
-  deletePost(@Req() req: any, @Param('id', ParseIntPipe) id: number) {
-    return this.postsService.deletePost(req.user.id, id);
+    return this.postsService.updatePost(id, req.user.sub, dto);
   }
 }

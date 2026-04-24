@@ -1,58 +1,60 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
   Param,
-  ParseIntPipe,
   Patch,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Request } from 'express';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AdminGuard } from './admin.guard';
 import { AdminService } from './admin.service';
-import { JwtAuthGuard } from '../../modules/auth/guards/jwt-auth.guard';
-import { UpdateUserStatusDto } from './dto/update-user-status.dto';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+
+type RequestCoUser = Request & {
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
 
 @ApiTags('Admin')
+@ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
-  @Get('users')
-  @ApiOperation({ summary: 'Lấy danh sách user' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách user thành công' })
-  getAllUsers() {
-    return this.adminService.getAllUsers();
+  @ApiOperation({ summary: 'Khóa người dùng' })
+  @Patch('users/:id/ban')
+  banUser(@Param('id') id: string, @Req() req: RequestCoUser) {
+    return this.adminService.banUser(req.user.sub, id);
   }
 
-  @Patch('users/:id/status')
-  @ApiOperation({ summary: 'Khóa / mở khóa tài khoản user' })
-  @ApiResponse({ status: 200, description: 'Cập nhật trạng thái user thành công' })
-  updateUserStatus(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: UpdateUserStatusDto,
-  ) {
-    return this.adminService.updateUserStatus(id, body);
+  @ApiOperation({ summary: 'Mở khóa người dùng' })
+  @Patch('users/:id/unban')
+  unbanUser(@Param('id') id: string, @Req() req: RequestCoUser) {
+    return this.adminService.unbanUser(req.user.sub, id);
   }
 
-  @Get('posts')
-  @ApiOperation({ summary: 'Lấy danh sách bài viết' })
-  @ApiResponse({ status: 200, description: 'Lấy danh sách bài viết thành công' })
-  getAllPosts() {
-    return this.adminService.getAllPosts();
+  @ApiOperation({ summary: 'Ẩn bài viết' })
+  @Patch('posts/:id/hide')
+  hidePost(@Param('id') id: string, @Req() req: RequestCoUser) {
+    return this.adminService.hidePost(req.user.sub, id);
   }
 
+  @ApiOperation({ summary: 'Xóa mềm bài viết' })
   @Delete('posts/:id')
-  @ApiOperation({ summary: 'Xóa bài viết vi phạm' })
-  @ApiResponse({ status: 200, description: 'Xóa bài viết thành công' })
-  deletePost(@Param('id', ParseIntPipe) id: number) {
-    return this.adminService.deletePost(id);
+  deletePost(@Param('id') id: string, @Req() req: RequestCoUser) {
+    return this.adminService.deletePost(req.user.sub, id);
+  }
+
+  @ApiOperation({ summary: 'Lấy lịch sử thao tác admin' })
+  @Get('logs')
+  getLogs() {
+    return this.adminService.getAdminLogs();
   }
 }

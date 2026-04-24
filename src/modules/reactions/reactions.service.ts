@@ -1,107 +1,197 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PostStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateReactionDto } from './dto/create-reaction.dto';
+import { ReactPostDto } from './dto/react-post.dto';
 
 @Injectable()
 export class ReactionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async reactToPost(userId: number, data: CreateReactionDto) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: data.postId },
+  async reactToPost(userId: string, dto: ReactPostDto) {
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: BigInt(dto.postId),
+        deletedAt: null,
+        status: PostStatus.PUBLISHED,
+      },
+      select: {
+        id: true,
+      },
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException('Không tìm thấy bài viết');
     }
 
     const existingReaction = await this.prisma.reaction.findUnique({
       where: {
         userId_postId: {
-          userId,
-          postId: data.postId,
-        },
-      },
-    });
-
-    if (existingReaction) {
-      const updatedReaction = await this.prisma.reaction.update({
-        where: { id: existingReaction.id },
-        data: { type: data.type as any },
-      });
-
-      return {
-        message: 'Reaction updated successfully',
-        reaction: updatedReaction,
-      };
-    }
-
-    const reaction = await this.prisma.reaction.create({
-      data: {
-        userId,
-        postId: data.postId,
-        type: data.type as any,
-      },
-    });
-
-    return {
-      message: 'Reaction created successfully',
-      reaction,
-    };
-  }
-
-  async removeReaction(userId: number, postId: number) {
-    const existingReaction = await this.prisma.reaction.findUnique({
-      where: {
-        userId_postId: {
-          userId,
-          postId,
+          userId: BigInt(userId),
+          postId: BigInt(dto.postId),
         },
       },
     });
 
     if (!existingReaction) {
-      throw new BadRequestException('Reaction not found');
+      const reaction = await this.prisma.reaction.create({
+        data: {
+          userId: BigInt(userId),
+          postId: BigInt(dto.postId),
+          type: dto.type,
+        },
+        select: {
+          id: true,
+          userId: true,
+          postId: true,
+          type: true,
+          createdAt: true,
+        },
+      });
+
+      await this.prisma.post.update({
+        where: {
+          id: BigInt(dto.postId),
+        },
+        data: {
+          reactionCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      return {
+        message: 'Thả cảm xúc thành công',
+        reaction: {
+          ...reaction,
+          id: reaction.id.toString(),
+          userId: reaction.userId.toString(),
+          postId: reaction.postId.toString(),
+        },
+      };
     }
 
-    await this.prisma.reaction.delete({
-      where: { id: existingReaction.id },
-    });
-
-    return {
-      message: 'Reaction removed successfully',
-    };
-  }
-
-  async countReactions(postId: number) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
-    });
-
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-    const total = await this.prisma.reaction.count({
-      where: { postId },
-    });
-
-    const byType = await this.prisma.reaction.groupBy({
-      by: ['type'],
-      where: { postId },
-      _count: {
+    const reaction = await this.prisma.reaction.update({
+      where: {
+        userId_postId: {
+          userId: BigInt(userId),
+          postId: BigInt(dto.postId),
+        },
+      },
+      data: {
+        type: dto.type,
+      },
+      select: {
+        id: true,
+        userId: true,
+        postId: true,
         type: true,
+        createdAt: true,
       },
     });
 
     return {
-      message: 'Count reactions successful',
-      total,
-      byType,
+      message: 'Cập nhật cảm xúc thành công',
+      reaction: {
+        ...reaction,
+        id: reaction.id.toString(),
+        userId: reaction.userId.toString(),
+        postId: reaction.postId.toString(),
+      },
+    };
+  }
+
+  async removeReaction(userId: string, postId: string) {
+    const existingReaction = await this.prisma.reaction.findUnique({
+      where: {
+        userId_postId: {
+          userId: BigInt(userId),
+          postId: BigInt(postId),
+        },
+      },
+    });
+
+    if (!existingReaction) {
+      throw new NotFoundException('Bạn chưa thả cảm xúc cho bài viết này');
+    }
+
+    await this.prisma.reaction.delete({
+      where: {
+        userId_postId: {
+          userId: BigInt(userId),
+          postId: BigInt(postId),
+        },
+      },
+    });
+
+    await this.prisma.post.update({
+      where: {
+        id: BigInt(postId),
+      },
+      data: {
+        reactionCount: {
+          decrement: 1,
+        },
+      },
+    });
+
+    return {
+      message: 'Bỏ cảm xúc thành công',
+    };
+  }
+
+  async getReactionsByPost(postId: string) {
+    const post = await this.prisma.post.findFirst({
+      where: {
+        id: BigInt(postId),
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!post) {
+      throw new NotFoundException('Không tìm thấy bài viết');
+    }
+
+    const reactions = await this.prisma.reaction.findMany({
+      where: {
+        postId: BigInt(postId),
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        userId: true,
+        postId: true,
+        type: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
+
+    return {
+      message: 'Lấy danh sách cảm xúc thành công',
+      reactions: reactions.map((reaction) => ({
+        ...reaction,
+        id: reaction.id.toString(),
+        userId: reaction.userId.toString(),
+        postId: reaction.postId.toString(),
+        user: {
+          ...reaction.user,
+          id: reaction.user.id.toString(),
+        },
+      })),
     };
   }
 }
