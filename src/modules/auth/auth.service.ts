@@ -1,107 +1,324 @@
 import {
+  BadRequestException,
   Injectable,
   UnauthorizedException,
-  BadRequestException
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { UserRole, UserStatus } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { PrismaService } from '../../prisma/prisma.service';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+
+type JwtPayload = {
+  sub: string;
+  email: string;
+  role: string;
+};
 
 @Injectable()
 export class AuthService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwtService: JwtService,
+  ) {}
 
-  // REGISTER
-  async register(registerDto: any) {
+  async register(dto: RegisterDto) {
+    const email = dto.email.trim().toLowerCase();
 
-    // TODO:
-    // Check email exists
+    const userDaTonTai = await this.prisma.user.findUnique({
+      where: { email },
+    });
 
-    // TODO:
-    // Hash password
+    if (userDaTonTai) {
+      throw new BadRequestException('Email đã tồn tại');
+    }
 
-    // TODO:
-    // Save user into database
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const user = await this.prisma.user.create({
+      data: {
+        fullName: dto.fullName.trim(),
+        email,
+        passwordHash,
+        role: UserRole.USER,
+        status: UserStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        role: true,
+        status: true,
+        createdAt: true,
+      },
+    });
 
     return {
-      message: 'User registered successfully',
+      message: 'Đăng ký thành công',
       user: {
-        fullName: registerDto.fullName,
-        email: registerDto.email
-      }
+        ...user,
+        id: user.id.toString(),
+      },
     };
   }
 
+  async login(dto: LoginDto, userAgent?: string, ipAddress?: string) {
+    const email = dto.email.trim().toLowerCase();
 
-  // LOGIN
-  async login(loginDto: any) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
 
-    // TODO:
-    // Find user by email
+    if (!user) {
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
 
-    // TODO:
-    // Compare password
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Tài khoản không hoạt động');
+    }
 
-    // TODO:
-    // Check status:
-    // active / locked / banned
+    const dungMatKhau = await bcrypt.compare(dto.password, user.passwordHash);
 
-    const accessToken = 'fake-access-token';
+    if (!dungMatKhau) {
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
 
-    const refreshToken = 'fake-refresh-token';
+    const accessSecret = process.env.JWT_ACCESS_SECRET;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+
+    if (!accessSecret || !refreshSecret) {
+      throw new Error('Thiếu cấu hình JWT trong file .env');
+    }
+
+    const accessTokenExpiresIn = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
+    const refreshTokenExpiresIn = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+
+    const payload: JwtPayload = {
+      sub: user.id.toString(),
+      email: user.email,
+      role: user.role,
+    };
+
+    const accessToken = await this.jwtService.signAsync(payload, {
+      secret: accessSecret,
+      expiresIn: accessTokenExpiresIn as any,
+    });
+
+    const refreshToken = await this.jwtService.signAsync(payload, {
+      secret: refreshSecret,
+      expiresIn: refreshTokenExpiresIn as any,
+    });
+
+    const tokenHash = await bcrypt.hash(refreshToken, 10);
+
+    const refreshExpiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    );
+
+    await this.prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        userAgent: userAgent || null,
+        ipAddress: ipAddress || null,
+        expiresAt: refreshExpiresAt,
+      },
+    });
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        lastLoginAt: new Date(),
+      },
+    });
 
     return {
-      message: 'Login successful',
-
+      message: 'Đăng nhập thành công',
       accessToken,
-
       refreshToken,
-
       user: {
-        email: loginDto.email
+        id: user.id.toString(),
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+      },
+    };
+  }
+
+  async refreshToken(refreshToken: string) {
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+    const accessSecret = process.env.JWT_ACCESS_SECRET;
+
+    if (!refreshSecret || !accessSecret) {
+      throw new Error('Thiếu cấu hình JWT trong file .env');
+    }
+
+    const accessTokenExpiresIn = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
+    const refreshTokenExpiresIn = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
+
+    let payload: JwtPayload;
+
+    try {
+      payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
+        secret: refreshSecret,
+      });
+    } catch {
+      throw new UnauthorizedException('Refresh token không hợp lệ');
+    }
+
+    const userId = BigInt(payload.sub);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Người dùng không tồn tại');
+    }
+
+    if (user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Tài khoản không hoạt động');
+    }
+
+    const danhSachToken = await this.prisma.refreshToken.findMany({
+      where: {
+        userId,
+        revokedAt: null,
+        expiresAt: {
+          gt: new Date(),
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    let tokenHopLeId: bigint | null = null;
+
+    for (const item of danhSachToken) {
+      const khop = await bcrypt.compare(refreshToken, item.tokenHash);
+      if (khop) {
+        tokenHopLeId = item.id;
+        break;
       }
+    }
+
+    if (!tokenHopLeId) {
+      throw new UnauthorizedException('Refresh token không được chấp nhận');
+    }
+
+    await this.prisma.refreshToken.update({
+      where: { id: tokenHopLeId },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    const newPayload: JwtPayload = {
+      sub: user.id.toString(),
+      email: user.email,
+      role: user.role,
     };
-  }
 
+    const newAccessToken = await this.jwtService.signAsync(newPayload, {
+      secret: accessSecret,
+      expiresIn: accessTokenExpiresIn as any,
+    });
 
-  // REFRESH TOKEN
-  async refreshToken(refreshDto: any) {
+    const newRefreshToken = await this.jwtService.signAsync(newPayload, {
+      secret: refreshSecret,
+      expiresIn: refreshTokenExpiresIn as any,
+    });
 
-    // TODO:
-    // Verify refresh token
+    const tokenHash = await bcrypt.hash(newRefreshToken, 10);
 
-    // TODO:
-    // Check in database
+    const refreshExpiresAt = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    );
 
-    // TODO:
-    // Generate new access token
+    await this.prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt: refreshExpiresAt,
+      },
+    });
 
     return {
-      accessToken: 'new-access-token',
-
-      refreshToken: 'new-refresh-token'
+      message: 'Làm mới token thành công',
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
     };
   }
 
+  async logout(refreshToken: string) {
+    const danhSachToken = await this.prisma.refreshToken.findMany({
+      where: {
+        revokedAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
 
-  // LOGOUT
-  async logout(refreshDto: any) {
+    let tokenHopLeId: bigint | null = null;
 
-    // TODO:
-    // Revoke refresh token
+    for (const item of danhSachToken) {
+      const khop = await bcrypt.compare(refreshToken, item.tokenHash);
+      if (khop) {
+        tokenHopLeId = item.id;
+        break;
+      }
+    }
+
+    if (!tokenHopLeId) {
+      throw new UnauthorizedException('Refresh token không hợp lệ');
+    }
+
+    await this.prisma.refreshToken.update({
+      where: { id: tokenHopLeId },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
 
     return {
-      message: 'Logged out successfully'
+      message: 'Đăng xuất thành công',
     };
   }
 
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: BigInt(userId),
+      },
+      select: {
+        id: true,
+        fullName: true,
+        email: true,
+        avatarUrl: true,
+        coverUrl: true,
+        bio: true,
+        role: true,
+        status: true,
+        emailVerifiedAt: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
 
-  // GET CURRENT USER
-  async getCurrentUser(user: any) {
+    if (!user) {
+      throw new UnauthorizedException('Không tìm thấy người dùng');
+    }
 
     return {
-      id: user?.id || '1',
-
-      email: user?.email || 'test@gmail.com',
-
-      role: user?.role || 'user'
+      message: 'Lấy thông tin tài khoản thành công',
+      user: {
+        ...user,
+        id: user.id.toString(),
+      },
     };
   }
-
 }
