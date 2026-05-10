@@ -6,13 +6,9 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { UserRole, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
-<<<<<<< HEAD
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from './mail.service';
-=======
-import { PrismaService } from '../../prisma/prisma.service';
->>>>>>> origin/main
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
@@ -27,10 +23,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-<<<<<<< HEAD
     private readonly mailService: MailService,
-=======
->>>>>>> origin/main
   ) {}
 
   async register(dto: RegisterDto) {
@@ -64,7 +57,6 @@ export class AuthService {
       },
     });
 
-<<<<<<< HEAD
     // tạo token verify
     const rawToken = crypto.randomBytes(32).toString('hex');
 
@@ -90,10 +82,6 @@ export class AuthService {
     return {
       message:
         'Đăng ký thành công. Kiểm tra email để xác thực.',
-=======
-    return {
-      message: 'Đăng ký thành công',
->>>>>>> origin/main
       user: {
         ...user,
         id: user.id.toString(),
@@ -101,15 +89,11 @@ export class AuthService {
     };
   }
 
-<<<<<<< HEAD
   async login(
     dto: LoginDto,
     userAgent?: string,
     ipAddress?: string,
   ) {
-=======
-  async login(dto: LoginDto, userAgent?: string, ipAddress?: string) {
->>>>>>> origin/main
     const email = dto.email.trim().toLowerCase();
 
     const user = await this.prisma.user.findUnique({
@@ -117,7 +101,6 @@ export class AuthService {
     });
 
     if (!user) {
-<<<<<<< HEAD
       throw new UnauthorizedException(
         'Email hoặc mật khẩu không đúng',
       );
@@ -159,30 +142,6 @@ export class AuthService {
     const refreshTokenExpiresIn =
       process.env
         .REFRESH_TOKEN_EXPIRES_IN || '7d';
-=======
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
-    }
-
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Tài khoản không hoạt động');
-    }
-
-    const dungMatKhau = await bcrypt.compare(dto.password, user.passwordHash);
-
-    if (!dungMatKhau) {
-      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
-    }
-
-    const accessSecret = process.env.JWT_ACCESS_SECRET;
-    const refreshSecret = process.env.JWT_REFRESH_SECRET;
-
-    if (!accessSecret || !refreshSecret) {
-      throw new Error('Thiếu cấu hình JWT trong file .env');
-    }
-
-    const accessTokenExpiresIn = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
-    const refreshTokenExpiresIn = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
->>>>>>> origin/main
 
     const payload: JwtPayload = {
       sub: user.id.toString(),
@@ -190,7 +149,6 @@ export class AuthService {
       role: user.role,
     };
 
-<<<<<<< HEAD
     const accessToken =
       await this.jwtService.signAsync(
         payload,
@@ -219,71 +177,38 @@ export class AuthService {
     const refreshExpiresAt = new Date(
       Date.now() +
         7 * 24 * 60 * 60 * 1000,
-=======
-    const accessToken = await this.jwtService.signAsync(payload, {
-      secret: accessSecret,
-      expiresIn: accessTokenExpiresIn as any,
-    });
-
-    const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: refreshSecret,
-      expiresIn: refreshTokenExpiresIn as any,
-    });
-
-    const tokenHash = await bcrypt.hash(refreshToken, 10);
-
-    const refreshExpiresAt = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
->>>>>>> origin/main
     );
 
     await this.prisma.refreshToken.create({
       data: {
         userId: user.id,
         tokenHash,
-<<<<<<< HEAD
         userAgent:
           userAgent || null,
         ipAddress:
           ipAddress || null,
         expiresAt:
           refreshExpiresAt,
-=======
-        userAgent: userAgent || null,
-        ipAddress: ipAddress || null,
-        expiresAt: refreshExpiresAt,
->>>>>>> origin/main
       },
     });
 
     await this.prisma.user.update({
-<<<<<<< HEAD
       where: {
         id: user.id,
       },
       data: {
         lastLoginAt:
           new Date(),
-=======
-      where: { id: user.id },
-      data: {
-        lastLoginAt: new Date(),
->>>>>>> origin/main
       },
     });
 
     return {
-<<<<<<< HEAD
       message:
         'Đăng nhập thành công',
-=======
-      message: 'Đăng nhập thành công',
->>>>>>> origin/main
       accessToken,
       refreshToken,
       user: {
         id: user.id.toString(),
-<<<<<<< HEAD
         fullName:
           user.fullName,
         email:
@@ -296,17 +221,10 @@ export class AuthService {
            !!user.emailVerifiedAt,
         emailVerifiedAt:
           user.emailVerifiedAt,
-=======
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-        status: user.status,
->>>>>>> origin/main
       },
     };
   }
 
-<<<<<<< HEAD
   async verifyEmail(
     token: string,
   ) {
@@ -467,23 +385,10 @@ export class AuthService {
     const refreshTokenExpiresIn =
       process.env
         .REFRESH_TOKEN_EXPIRES_IN || '7d';
-=======
-  async refreshToken(refreshToken: string) {
-    const refreshSecret = process.env.JWT_REFRESH_SECRET;
-    const accessSecret = process.env.JWT_ACCESS_SECRET;
-
-    if (!refreshSecret || !accessSecret) {
-      throw new Error('Thiếu cấu hình JWT trong file .env');
-    }
-
-    const accessTokenExpiresIn = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
-    const refreshTokenExpiresIn = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
->>>>>>> origin/main
 
     let payload: JwtPayload;
 
     try {
-<<<<<<< HEAD
       payload =
         await this.jwtService.verifyAsync<JwtPayload>(
           refreshToken,
@@ -549,54 +454,11 @@ export class AuthService {
       if (khop) {
         tokenHopLeId =
           item.id;
-=======
-      payload = await this.jwtService.verifyAsync<JwtPayload>(refreshToken, {
-        secret: refreshSecret,
-      });
-    } catch {
-      throw new UnauthorizedException('Refresh token không hợp lệ');
-    }
-
-    const userId = BigInt(payload.sub);
-
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('Người dùng không tồn tại');
-    }
-
-    if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Tài khoản không hoạt động');
-    }
-
-    const danhSachToken = await this.prisma.refreshToken.findMany({
-      where: {
-        userId,
-        revokedAt: null,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    let tokenHopLeId: bigint | null = null;
-
-    for (const item of danhSachToken) {
-      const khop = await bcrypt.compare(refreshToken, item.tokenHash);
-      if (khop) {
-        tokenHopLeId = item.id;
->>>>>>> origin/main
         break;
       }
     }
 
     if (!tokenHopLeId) {
-<<<<<<< HEAD
       throw new UnauthorizedException(
         'Refresh token không được chấp nhận',
       );
@@ -709,76 +571,10 @@ export class AuthService {
       if (ok) {
         tokenId =
           item.id;
-=======
-      throw new UnauthorizedException('Refresh token không được chấp nhận');
-    }
-
-    await this.prisma.refreshToken.update({
-      where: { id: tokenHopLeId },
-      data: {
-        revokedAt: new Date(),
-      },
-    });
-
-    const newPayload: JwtPayload = {
-      sub: user.id.toString(),
-      email: user.email,
-      role: user.role,
-    };
-
-    const newAccessToken = await this.jwtService.signAsync(newPayload, {
-      secret: accessSecret,
-      expiresIn: accessTokenExpiresIn as any,
-    });
-
-    const newRefreshToken = await this.jwtService.signAsync(newPayload, {
-      secret: refreshSecret,
-      expiresIn: refreshTokenExpiresIn as any,
-    });
-
-    const tokenHash = await bcrypt.hash(newRefreshToken, 10);
-
-    const refreshExpiresAt = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
-    );
-
-    await this.prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt: refreshExpiresAt,
-      },
-    });
-
-    return {
-      message: 'Làm mới token thành công',
-      accessToken: newAccessToken,
-      refreshToken: newRefreshToken,
-    };
-  }
-
-  async logout(refreshToken: string) {
-    const danhSachToken = await this.prisma.refreshToken.findMany({
-      where: {
-        revokedAt: null,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    let tokenHopLeId: bigint | null = null;
-
-    for (const item of danhSachToken) {
-      const khop = await bcrypt.compare(refreshToken, item.tokenHash);
-      if (khop) {
-        tokenHopLeId = item.id;
->>>>>>> origin/main
         break;
       }
     }
 
-<<<<<<< HEAD
     if (!tokenId) {
       throw new UnauthorizedException(
         'Refresh token không hợp lệ',
@@ -849,58 +645,10 @@ export class AuthService {
     return {
       message:
         'Lấy thông tin tài khoản thành công',
-=======
-    if (!tokenHopLeId) {
-      throw new UnauthorizedException('Refresh token không hợp lệ');
-    }
-
-    await this.prisma.refreshToken.update({
-      where: { id: tokenHopLeId },
-      data: {
-        revokedAt: new Date(),
-      },
-    });
-
-    return {
-      message: 'Đăng xuất thành công',
-    };
-  }
-
-  async getMe(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: {
-        id: BigInt(userId),
-      },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        avatarUrl: true,
-        coverUrl: true,
-        bio: true,
-        role: true,
-        status: true,
-        emailVerifiedAt: true,
-        lastLoginAt: true,
-        createdAt: true,
-      },
-    });
-
-    if (!user) {
-      throw new UnauthorizedException('Không tìm thấy người dùng');
-    }
-
-    return {
-      message: 'Lấy thông tin tài khoản thành công',
->>>>>>> origin/main
       user: {
         ...user,
         id: user.id.toString(),
       },
     };
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> origin/main

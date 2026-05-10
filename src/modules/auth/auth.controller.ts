@@ -7,10 +7,7 @@ import {
   Req,
   UnauthorizedException,
   UseGuards,
-<<<<<<< HEAD
   Param,
-=======
->>>>>>> origin/main
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -19,10 +16,7 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
-<<<<<<< HEAD
 import { ResendVerificationDto } from './dto/resend-verification.dto';
-=======
->>>>>>> origin/main
 
 type AuthenticatedRequest = Request & {
   user: {
@@ -45,10 +39,6 @@ export class AuthController {
   @Post('login')
   login(
     @Body() dto: LoginDto,
-<<<<<<< HEAD
-=======
-    @Headers('user-agent') userAgent: string,
->>>>>>> origin/main
     @Req() req: Request,
   ) {
     const ipAddress =
@@ -56,11 +46,7 @@ export class AuthController {
       req.socket.remoteAddress ||
       '';
 
-<<<<<<< HEAD
     return this.authService.login(dto, ipAddress);
-=======
-    return this.authService.login(dto, userAgent, ipAddress);
->>>>>>> origin/main
   }
 
   @Post('refresh')
@@ -87,7 +73,6 @@ export class AuthController {
   me(@Req() req: AuthenticatedRequest) {
     return this.authService.getMe(req.user.sub);
   }
-<<<<<<< HEAD
   @Get('verify-email/:token')
 verifyEmail(
   @Param('token') token: string,
@@ -105,6 +90,4 @@ resendVerification(
 }
 
 
-=======
->>>>>>> origin/main
 }
