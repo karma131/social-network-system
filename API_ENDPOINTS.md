@@ -4,7 +4,7 @@ Tai lieu nay tong hop toan bo endpoint backend de frontend ghep API truc tiep.
 
 ## Thong tin chung
 
-- Base URL local: `http://localhost:3000`
+- Base URL local: `http://localhost:8080`
 - Swagger UI: `GET /api-docs`
 - Backend hien khong dat global prefix, nen URL dung la dung nhu ben duoi
 - Cac route can auth su dung header:

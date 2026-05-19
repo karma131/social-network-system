@@ -22,7 +22,7 @@ import type { Request } from 'express';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { multerDiskStorage } from '../uploads/multer.config';
+import { multerCloudinaryOptions } from '../uploads/multer.config';
 import { QueryUsersDto } from './dto/query-users.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { UpdateCoverDto } from './dto/update-cover.dto';
@@ -63,10 +63,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Cap nhat profile hien tai' })
   @Patch('me')
-  updateMyProfile(
-    @Req() req: RequestCoUser,
-    @Body() dto: UpdateProfileDto,
-  ) {
+  updateMyProfile(@Req() req: RequestCoUser, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateMyProfile(req.user.sub, dto);
   }
 
@@ -90,7 +87,7 @@ export class UsersController {
     },
   })
   @Patch('me/avatar')
-  @UseInterceptors(FileInterceptor('file', { storage: multerDiskStorage }))
+  @UseInterceptors(FileInterceptor('file', multerCloudinaryOptions))
   updateAvatar(
     @Req() req: RequestCoUser,
     @Body() dto: UpdateAvatarDto,
@@ -119,7 +116,7 @@ export class UsersController {
     },
   })
   @Patch('me/cover')
-  @UseInterceptors(FileInterceptor('file', { storage: multerDiskStorage }))
+  @UseInterceptors(FileInterceptor('file', multerCloudinaryOptions))
   updateCover(
     @Req() req: RequestCoUser,
     @Body() dto: UpdateCoverDto,

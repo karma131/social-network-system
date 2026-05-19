@@ -22,6 +22,7 @@ import type { Request } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UploadType } from '@prisma/client';
+import { multerCloudinaryOptions } from './multer.config';
 import { UploadsService } from './uploads.service';
 
 type RequestCoUser = Request & {
@@ -58,7 +59,7 @@ export class UploadsController {
     },
   })
   @Post('single')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', multerCloudinaryOptions))
   uploadSingle(
     @Req() req: RequestCoUser,
     @UploadedFile() file: Express.Multer.File,
@@ -93,7 +94,7 @@ export class UploadsController {
     },
   })
   @Post('multiple')
-  @UseInterceptors(FilesInterceptor('files', 10))
+  @UseInterceptors(FilesInterceptor('files', 10, multerCloudinaryOptions))
   uploadMultiple(
     @Req() req: RequestCoUser,
     @UploadedFiles() files: Express.Multer.File[],

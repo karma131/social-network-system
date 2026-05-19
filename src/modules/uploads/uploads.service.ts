@@ -1,10 +1,18 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { UploadType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Express } from 'express';
+import { CloudinaryService } from './cloudinary.service';
 @Injectable()
 export class UploadsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   async saveFile(
     userId: string,
@@ -15,15 +23,18 @@ export class UploadsService {
       throw new BadRequestException('Không có file được tải lên');
     }
 
-    const fileUrl = `/${process.env.UPLOAD_DIR || 'uploads'}/${file.filename}`;
+    const uploadedFile = await this.cloudinaryService.uploadFile(
+      file,
+      uploadType,
+    );
 
     const upload = await this.prisma.upload.create({
       data: {
         userId: BigInt(userId),
-        fileUrl,
+        fileUrl: uploadedFile.secure_url,
         fileName: file.originalname,
-        mimeType: file.mimetype,
-        fileSize: BigInt(file.size),
+        mimeType: file.mimetype || uploadedFile.resource_type,
+        fileSize: BigInt(uploadedFile.bytes || file.size),
         uploadType,
       },
       select: {
@@ -60,15 +71,18 @@ export class UploadsService {
 
     const createdUploads = await Promise.all(
       files.map(async (file) => {
-        const fileUrl = `/${process.env.UPLOAD_DIR || 'uploads'}/${file.filename}`;
+        const uploadedFile = await this.cloudinaryService.uploadFile(
+          file,
+          uploadType,
+        );
 
         return this.prisma.upload.create({
           data: {
             userId: BigInt(userId),
-            fileUrl,
+            fileUrl: uploadedFile.secure_url,
             fileName: file.originalname,
-            mimeType: file.mimetype,
-            fileSize: BigInt(file.size),
+            mimeType: file.mimetype || uploadedFile.resource_type,
+            fileSize: BigInt(uploadedFile.bytes || file.size),
             uploadType,
           },
           select: {
