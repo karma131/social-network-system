@@ -66,7 +66,7 @@ export class FeedsService {
           user: {
             select: {
               id: true,
-              fullName: true,
+              name: true,
               avatarUrl: true,
             },
           },

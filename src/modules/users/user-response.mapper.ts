@@ -1,6 +1,6 @@
 type UserRecord = {
   id: bigint;
-  fullName: string;
+  name: string;
   email?: string;
   avatarUrl: string | null;
   coverUrl: string | null;
@@ -16,7 +16,7 @@ type UserRecord = {
 export function mapPrivateUser(user: UserRecord) {
   return {
     id: user.id.toString(),
-    fullName: user.fullName,
+    name: user.name,
     email: user.email,
     avatarUrl: user.avatarUrl,
     coverUrl: user.coverUrl,
@@ -33,7 +33,7 @@ export function mapPrivateUser(user: UserRecord) {
 export function mapPublicUser(user: UserRecord) {
   return {
     id: user.id.toString(),
-    fullName: user.fullName,
+    name: user.name,
     avatarUrl: user.avatarUrl,
     coverUrl: user.coverUrl,
     bio: user.bio,

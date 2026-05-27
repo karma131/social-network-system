@@ -15,7 +15,7 @@ import { mapPrivateUser, mapPublicUser } from './user-response.mapper';
 
 const PRIVATE_USER_SELECT = {
   id: true,
-  fullName: true,
+  name: true,
   email: true,
   avatarUrl: true,
   coverUrl: true,
@@ -30,7 +30,7 @@ const PRIVATE_USER_SELECT = {
 
 const PUBLIC_USER_SELECT = {
   id: true,
-  fullName: true,
+  name: true,
   avatarUrl: true,
   coverUrl: true,
   bio: true,
@@ -82,8 +82,9 @@ export class UsersService {
     }
 
     return {
+      success: true,
       message: 'Lay thong tin nguoi dung thanh cong',
-      user: mapPrivateUser(user),
+      data: mapPrivateUser(user),
     };
   }
 
@@ -91,16 +92,16 @@ export class UsersService {
     await this.ensureActiveAccount(userId);
 
     const data: {
-      fullName?: string;
+      name?: string;
       bio?: string | null;
     } = {};
 
-    if (dto.fullName !== undefined) {
-      const fullName = dto.fullName.trim();
-      if (!fullName) {
+    if (dto.name !== undefined) {
+      const name = dto.name.trim();
+      if (!name) {
         throw new BadRequestException('Ho ten khong duoc de trong');
       }
-      data.fullName = fullName;
+      data.name = name;
     }
 
     if (dto.bio !== undefined) {
@@ -201,7 +202,7 @@ export class UsersService {
       ...(search
         ? {
             OR: [
-              { fullName: { contains: search, mode: 'insensitive' as const } },
+              { name: { contains: search, mode: 'insensitive' as const } },
               { email: { contains: search, mode: 'insensitive' as const } },
             ],
           }

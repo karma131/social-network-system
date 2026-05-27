@@ -23,6 +23,18 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  private async signAccessToken(payload: JwtPayload): Promise<string> {
+    const accessSecret = process.env.JWT_ACCESS_SECRET;
+    if (!accessSecret) {
+      throw new Error('Thiếu cấu hình JWT trong file .env');
+    }
+    const accessTokenExpiresIn = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
+    return this.jwtService.signAsync(payload, {
+      secret: accessSecret,
+      expiresIn: accessTokenExpiresIn as any,
+    });
+  }
+
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
 
@@ -38,7 +50,7 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        fullName: dto.fullName.trim(),
+        name: dto.name.trim(),
         email,
         passwordHash,
         role: UserRole.USER,
@@ -46,7 +58,7 @@ export class AuthService {
       },
       select: {
         id: true,
-        fullName: true,
+        name: true,
         email: true,
         role: true,
         status: true,
@@ -54,11 +66,21 @@ export class AuthService {
       },
     });
 
+    const token = await this.signAccessToken({
+      sub: user.id.toString(),
+      email: user.email,
+      role: user.role,
+    });
+
     return {
+      success: true,
       message: 'Đăng ký thành công',
-      user: {
-        ...user,
-        id: user.id.toString(),
+      data: {
+        token,
+        user: {
+          ...user,
+          id: user.id.toString(),
+        },
       },
     };
   }
@@ -134,15 +156,18 @@ export class AuthService {
     });
 
     return {
+      success: true,
       message: 'Đăng nhập thành công',
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id.toString(),
-        fullName: user.fullName,
-        email: user.email,
-        role: user.role,
-        status: user.status,
+      data: {
+        token: accessToken,
+        refreshToken,
+        user: {
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          status: user.status,
+        },
       },
     };
   }
@@ -296,7 +321,7 @@ export class AuthService {
       },
       select: {
         id: true,
-        fullName: true,
+        name: true,
         email: true,
         avatarUrl: true,
         coverUrl: true,
@@ -314,8 +339,9 @@ export class AuthService {
     }
 
     return {
+      success: true,
       message: 'Lấy thông tin tài khoản thành công',
-      user: {
+      data: {
         ...user,
         id: user.id.toString(),
       },

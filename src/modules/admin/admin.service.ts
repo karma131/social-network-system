@@ -34,7 +34,7 @@ export class AdminService {
       },
       select: {
         id: true,
-        fullName: true,
+        name: true,
         email: true,
         role: true,
         status: true,
@@ -90,7 +90,7 @@ export class AdminService {
     },
     select: {
       id: true,
-      fullName: true,
+      name: true,
       email: true,
       role: true,
       updatedAt: true,
@@ -117,7 +117,7 @@ export class AdminService {
   };
 }
 async createAdmin(adminId: string, dto: any) {
-  const { fullName, email, password, role, status } = dto;
+  const { name, email, password, role, status } = dto;
 
   // 🔹 check email tồn tại
   const existingUser = await this.prisma.user.findUnique({
@@ -134,7 +134,7 @@ async createAdmin(adminId: string, dto: any) {
   // 🔹 tạo user
   const newUser = await this.prisma.user.create({
     data: {
-      fullName,
+      name,
       email,
       passwordHash: hashedPassword,
       role: role || 'ADMIN',
@@ -142,7 +142,7 @@ async createAdmin(adminId: string, dto: any) {
     },
     select: {
       id: true,
-      fullName: true,
+      name: true,
       email: true,
       role: true,
       status: true,
@@ -194,7 +194,7 @@ async createAdmin(adminId: string, dto: any) {
       },
       select: {
         id: true,
-        fullName: true,
+        name: true,
         email: true,
         role: true,
         status: true,
@@ -233,7 +233,7 @@ async createAdmin(adminId: string, dto: any) {
     where: {
       OR: [
         {
-          fullName: {
+          name: {
             contains: search,
             mode: 'insensitive',
           },
@@ -253,7 +253,7 @@ async createAdmin(adminId: string, dto: any) {
     },
     select: {
       id: true,
-      fullName: true,
+      name: true,
       email: true,
       avatarUrl: true,
       role: true,
@@ -266,7 +266,7 @@ async createAdmin(adminId: string, dto: any) {
     where: {
       OR: [
         {
-          fullName: {
+          name: {
             contains: search,
             mode: 'insensitive',
           },
@@ -449,7 +449,7 @@ async getPosts(query: any) {
       user: {
         select: {
           id: true,
-          fullName: true,
+          name: true,
           email: true,
         },
       },
@@ -666,7 +666,7 @@ async getPostReport(query: any) {
         admin: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             email: true,
           },
         },
