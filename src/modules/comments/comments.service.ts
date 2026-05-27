@@ -63,7 +63,7 @@ export class CommentsService {
         user: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             avatarUrl: true,
           },
         },
@@ -129,7 +129,7 @@ export class CommentsService {
         user: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             avatarUrl: true,
           },
         },

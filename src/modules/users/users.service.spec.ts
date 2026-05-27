@@ -21,7 +21,7 @@ describe('UsersService', () => {
 
   const privateUser = {
     id: BigInt(1),
-    fullName: 'Nguyen Van A',
+    name: 'Nguyen Van A',
     email: 'a@gmail.com',
     avatarUrl: null,
     coverUrl: null,
@@ -69,14 +69,14 @@ describe('UsersService', () => {
 
     const result = await service.getMyProfile('1');
 
-    expect(result.user).toMatchObject({
+    expect(result.data).toMatchObject({
       id: '1',
-      fullName: 'Nguyen Van A',
+      name: 'Nguyen Van A',
       email: 'a@gmail.com',
       role: UserRole.USER,
       status: UserStatus.ACTIVE,
     });
-    expect(result.user).not.toHaveProperty('passwordHash');
+    expect(result.data).not.toHaveProperty('passwordHash');
   });
 
   it('should update profile full name and bio', async () => {
@@ -87,24 +87,24 @@ describe('UsersService', () => {
     });
     prisma.user.update.mockResolvedValue({
       ...privateUser,
-      fullName: 'Nguyen Van B',
+      name: 'Nguyen Van B',
       bio: 'Hello',
     });
 
     const result = await service.updateMyProfile('1', {
-      fullName: ' Nguyen Van B ',
+      name: ' Nguyen Van B ',
       bio: ' Hello ',
     });
 
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: BigInt(1) },
       data: {
-        fullName: 'Nguyen Van B',
+        name: 'Nguyen Van B',
         bio: 'Hello',
       },
       select: expect.any(Object),
     });
-    expect(result.user.fullName).toBe('Nguyen Van B');
+    expect(result.user.name).toBe('Nguyen Van B');
     expect(result.user.bio).toBe('Hello');
   });
 
@@ -161,7 +161,7 @@ describe('UsersService', () => {
   it('should get public profile without email and passwordHash', async () => {
     prisma.user.findFirst.mockResolvedValue({
       id: BigInt(2),
-      fullName: 'Public User',
+      name: 'Public User',
       avatarUrl: null,
       coverUrl: null,
       bio: 'Public bio',
@@ -171,7 +171,7 @@ describe('UsersService', () => {
 
     expect(result.user).toEqual({
       id: '2',
-      fullName: 'Public User',
+      name: 'Public User',
       avatarUrl: null,
       coverUrl: null,
       bio: 'Public bio',

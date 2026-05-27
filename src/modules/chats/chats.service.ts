@@ -33,7 +33,7 @@ export class ChatsService {
       },
       select: {
         id: true,
-        fullName: true,
+        name: true,
       },
     });
 
@@ -113,7 +113,7 @@ export class ChatsService {
             user: {
               select: {
                 id: true,
-                fullName: true,
+                name: true,
                 avatarUrl: true,
               },
             },
@@ -200,7 +200,7 @@ export class ChatsService {
             user: {
               select: {
                 id: true,
-                fullName: true,
+                name: true,
                 avatarUrl: true,
               },
             },
@@ -258,7 +258,7 @@ export class ChatsService {
                 sender: {
                   select: {
                     id: true,
-                    fullName: true,
+                    name: true,
                   },
                 },
               },
@@ -274,7 +274,7 @@ export class ChatsService {
                 user: {
                   select: {
                     id: true,
-                    fullName: true,
+                    name: true,
                     avatarUrl: true,
                   },
                 },
@@ -356,7 +356,7 @@ export class ChatsService {
             user: {
               select: {
                 id: true,
-                fullName: true,
+                name: true,
                 avatarUrl: true,
                 email: true,
               },
@@ -450,7 +450,7 @@ export class ChatsService {
         sender: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             avatarUrl: true,
           },
         },
@@ -533,7 +533,7 @@ export class ChatsService {
           sender: {
             select: {
               id: true,
-              fullName: true,
+              name: true,
               avatarUrl: true,
             },
           },

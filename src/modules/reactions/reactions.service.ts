@@ -173,7 +173,7 @@ export class ReactionsService {
         user: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             avatarUrl: true,
           },
         },

@@ -1,18 +1,21 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateAdminDto {
   @ApiProperty({ example: 'Nguyen Van B' })
   @IsString()
-  fullName: string;
+  @MinLength(2)
+  @MaxLength(60)
+  name: string;
 
   @ApiProperty({ example: 'admin2@gmail.com' })
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: '123456' })
+  @ApiProperty({ example: '12345678' })
   @IsString()
-  @MinLength(6)
+  @MinLength(8)
+  @MaxLength(128)
   password: string;
 
   @ApiProperty({ example: 'ADMIN', enum: ['USER', 'ADMIN'] })

@@ -38,7 +38,7 @@ export class PostsService {
         user: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             email: true,
             avatarUrl: true,
           },
@@ -82,7 +82,7 @@ export class PostsService {
         user: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             avatarUrl: true,
           },
         },
@@ -152,7 +152,7 @@ export class PostsService {
         user: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             avatarUrl: true,
             bio: true,
           },

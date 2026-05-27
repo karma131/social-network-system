@@ -28,7 +28,7 @@ export class NotificationsService {
         actor: {
           select: {
             id: true,
-            fullName: true,
+            name: true,
             avatarUrl: true,
           },
         },

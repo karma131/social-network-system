@@ -65,11 +65,13 @@ describe('AuthService', () => {
   });
 
   it('should register a new user with normalized email and hashed password', async () => {
+    process.env.JWT_ACCESS_SECRET = 'access-secret';
     const createdAt = new Date('2026-04-28T00:00:00.000Z');
     prisma.user.findUnique.mockResolvedValue(null);
+    jwtService.signAsync.mockResolvedValue('access-token');
     prisma.user.create.mockResolvedValue({
       id: BigInt(1),
-      fullName: 'Nguyen Van A',
+      name: 'Nguyen Van A',
       email: 'a@gmail.com',
       role: UserRole.USER,
       status: UserStatus.ACTIVE,
@@ -78,7 +80,7 @@ describe('AuthService', () => {
     bcryptMock.hash.mockResolvedValue('hashed-password' as never);
 
     const result = await service.register({
-      fullName: ' Nguyen Van A ',
+      name: ' Nguyen Van A ',
       email: ' A@GMAIL.COM ',
       password: '123456',
     });
@@ -88,7 +90,7 @@ describe('AuthService', () => {
     });
     expect(prisma.user.create).toHaveBeenCalledWith({
       data: {
-        fullName: 'Nguyen Van A',
+        name: 'Nguyen Van A',
         email: 'a@gmail.com',
         passwordHash: 'hashed-password',
         role: UserRole.USER,
@@ -96,14 +98,14 @@ describe('AuthService', () => {
       },
       select: {
         id: true,
-        fullName: true,
+        name: true,
         email: true,
         role: true,
         status: true,
         createdAt: true,
       },
     });
-    expect(result.user.id).toBe('1');
+    expect(result.data.user.id).toBe('1');
   });
 
   it('should reject duplicated email during registration', async () => {
@@ -111,7 +113,7 @@ describe('AuthService', () => {
 
     await expect(
       service.register({
-        fullName: 'Nguyen Van A',
+        name: 'Nguyen Van A',
         email: 'a@gmail.com',
         password: '123456',
       }),
@@ -124,7 +126,7 @@ describe('AuthService', () => {
 
     prisma.user.findUnique.mockResolvedValue({
       id: BigInt(1),
-      fullName: 'Nguyen Van A',
+      name: 'Nguyen Van A',
       email: 'a@gmail.com',
       passwordHash: 'stored-hash',
       role: UserRole.USER,
@@ -135,6 +137,7 @@ describe('AuthService', () => {
     jwtService.signAsync
       .mockResolvedValueOnce('access-token')
       .mockResolvedValueOnce('refresh-token');
+    prisma.user.update.mockResolvedValue({} as never);
 
     const result = await service.login(
       {
@@ -165,9 +168,9 @@ describe('AuthService', () => {
         ipAddress: '127.0.0.1',
       }),
     });
-    expect(result.accessToken).toBe('access-token');
-    expect(result.refreshToken).toBe('refresh-token');
-    expect(result.user.id).toBe('1');
+    expect(result.data.token).toBe('access-token');
+    expect(result.data.refreshToken).toBe('refresh-token');
+    expect(result.data.user.id).toBe('1');
   });
 
   it('should reject login with wrong password', async () => {

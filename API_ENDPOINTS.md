@@ -4,9 +4,9 @@ Tai lieu nay tong hop toan bo endpoint backend de frontend ghep API truc tiep.
 
 ## Thong tin chung
 
-- Base URL local: `http://localhost:8080`
+- Base URL local: `http://localhost:8080/api/v1`
 - Swagger UI: `GET /api-docs`
-- Backend hien khong dat global prefix, nen URL dung la dung nhu ben duoi
+- Global prefix: `/api/v1` (theo chuan social-platform-be). Vi du: `POST /api/v1/auth/login`.
 - Cac route can auth su dung header:
 
 ```http
@@ -95,9 +95,9 @@ Authorization: Bearer <accessToken>
 
 ```json
 {
-  "fullName": "Nguyen Van A",
+  "name": "Nguyen Van A",
   "email": "a@gmail.com",
-  "password": "123456"
+  "password": "12345678"
 }
 ```
 
@@ -108,7 +108,7 @@ Authorization: Bearer <accessToken>
   "message": "Dang ky thanh cong",
   "user": {
     "id": "1",
-    "fullName": "Nguyen Van A",
+    "name": "Nguyen Van A",
     "email": "a@gmail.com",
     "role": "USER",
     "status": "ACTIVE",
@@ -125,7 +125,7 @@ Authorization: Bearer <accessToken>
 ```json
 {
   "email": "a@gmail.com",
-  "password": "123456"
+  "password": "12345678"
 }
 ```
 
@@ -138,7 +138,7 @@ Authorization: Bearer <accessToken>
   "refreshToken": "<jwt_refresh_token>",
   "user": {
     "id": "1",
-    "fullName": "Nguyen Van A",
+    "name": "Nguyen Van A",
     "email": "a@gmail.com",
     "role": "USER",
     "status": "ACTIVE"
@@ -196,7 +196,7 @@ Authorization: Bearer <accessToken>
   "message": "Lay thong tin tai khoan thanh cong",
   "user": {
     "id": "1",
-    "fullName": "Nguyen Van A",
+    "name": "Nguyen Van A",
     "email": "a@gmail.com",
     "avatarUrl": "/uploads/avatar.jpg",
     "coverUrl": "/uploads/cover.jpg",
@@ -234,7 +234,7 @@ GET /users?page=1&limit=20&search=nguyen
   "users": [
     {
       "id": "1",
-      "fullName": "Nguyen Van A",
+      "name": "Nguyen Van A",
       "email": "a@gmail.com",
       "avatarUrl": null,
       "coverUrl": null,
@@ -266,7 +266,7 @@ GET /users?page=1&limit=20&search=nguyen
   "message": "Lay thong tin nguoi dung thanh cong",
   "user": {
     "id": "1",
-    "fullName": "Nguyen Van A",
+    "name": "Nguyen Van A",
     "email": "a@gmail.com",
     "avatarUrl": null,
     "coverUrl": null,
@@ -288,7 +288,7 @@ GET /users?page=1&limit=20&search=nguyen
 
 ```json
 {
-  "fullName": "Nguyen Van B",
+  "name": "Nguyen Van B",
   "bio": "Xin chao"
 }
 ```
@@ -300,7 +300,7 @@ GET /users?page=1&limit=20&search=nguyen
   "message": "Cap nhat ho so thanh cong",
   "user": {
     "id": "1",
-    "fullName": "Nguyen Van B",
+    "name": "Nguyen Van B",
     "email": "a@gmail.com",
     "avatarUrl": null,
     "coverUrl": null,
@@ -339,7 +339,7 @@ GET /users?page=1&limit=20&search=nguyen
   "message": "Cap nhat avatar thanh cong",
   "user": {
     "id": "1",
-    "fullName": "Nguyen Van A",
+    "name": "Nguyen Van A",
     "email": "a@gmail.com",
     "avatarUrl": "/uploads/abc.jpg",
     "coverUrl": null,
@@ -378,7 +378,7 @@ GET /users?page=1&limit=20&search=nguyen
   "message": "Lay thong tin public cua nguoi dung thanh cong",
   "user": {
     "id": "2",
-    "fullName": "Tran Van C",
+    "name": "Tran Van C",
     "avatarUrl": null,
     "coverUrl": null,
     "bio": "Hello"
@@ -418,7 +418,7 @@ GET /users?page=1&limit=20&search=nguyen
     "updatedAt": "2026-05-09T10:00:00.000Z",
     "user": {
       "id": "1",
-      "fullName": "Nguyen Van A",
+      "name": "Nguyen Van A",
       "email": "a@gmail.com",
       "avatarUrl": null
     }
@@ -447,7 +447,7 @@ GET /users?page=1&limit=20&search=nguyen
       "updatedAt": "2026-05-09T10:00:00.000Z",
       "user": {
         "id": "1",
-        "fullName": "Nguyen Van A",
+        "name": "Nguyen Van A",
         "avatarUrl": null
       }
     }
@@ -499,7 +499,7 @@ GET /users?page=1&limit=20&search=nguyen
     "updatedAt": "2026-05-09T10:00:00.000Z",
     "user": {
       "id": "1",
-      "fullName": "Nguyen Van A",
+      "name": "Nguyen Van A",
       "avatarUrl": null,
       "bio": "Hello"
     }
@@ -570,7 +570,7 @@ GET /users?page=1&limit=20&search=nguyen
     "updatedAt": "2026-05-09T10:00:00.000Z",
     "user": {
       "id": "1",
-      "fullName": "Nguyen Van A",
+      "name": "Nguyen Van A",
       "avatarUrl": null
     }
   }
@@ -597,7 +597,7 @@ GET /users?page=1&limit=20&search=nguyen
       "updatedAt": "2026-05-09T10:00:00.000Z",
       "user": {
         "id": "1",
-        "fullName": "Nguyen Van A",
+        "name": "Nguyen Van A",
         "avatarUrl": null
       }
     }
@@ -717,7 +717,7 @@ GET /users?page=1&limit=20&search=nguyen
       "createdAt": "2026-05-09T10:00:00.000Z",
       "user": {
         "id": "1",
-        "fullName": "Nguyen Van A",
+        "name": "Nguyen Van A",
         "avatarUrl": null
       }
     }
@@ -750,7 +750,7 @@ GET /users?page=1&limit=20&search=nguyen
     "createdAt": "2026-05-09T10:00:00.000Z",
     "following": {
       "id": "2",
-      "fullName": "Tran Van C",
+      "name": "Tran Van C",
       "email": "c@gmail.com",
       "avatarUrl": null
     }
@@ -783,7 +783,7 @@ GET /users?page=1&limit=20&search=nguyen
       "createdAt": "2026-05-09T10:00:00.000Z",
       "user": {
         "id": "1",
-        "fullName": "Nguyen Van A",
+        "name": "Nguyen Van A",
         "email": "a@gmail.com",
         "avatarUrl": null,
         "bio": null
@@ -807,7 +807,7 @@ GET /users?page=1&limit=20&search=nguyen
       "createdAt": "2026-05-09T10:00:00.000Z",
       "user": {
         "id": "2",
-        "fullName": "Tran Van C",
+        "name": "Tran Van C",
         "email": "c@gmail.com",
         "avatarUrl": null,
         "bio": null
@@ -869,7 +869,7 @@ GET /feeds/me?page=1&limit=10
       "updatedAt": "2026-05-09T10:00:00.000Z",
       "user": {
         "id": "2",
-        "fullName": "Tran Van C",
+        "name": "Tran Van C",
         "avatarUrl": null
       },
       "reactions": [
@@ -911,7 +911,7 @@ GET /feeds/me?page=1&limit=10
       "createdAt": "2026-05-09T10:00:00.000Z",
       "actor": {
         "id": "2",
-        "fullName": "Tran Van C",
+        "name": "Tran Van C",
         "avatarUrl": null
       }
     }
@@ -1093,7 +1093,7 @@ GET /feeds/me?page=1&limit=10
         "joinedAt": "2026-05-09T10:00:00.000Z",
         "user": {
           "id": "1",
-          "fullName": "Nguyen Van A",
+          "name": "Nguyen Van A",
           "avatarUrl": null
         }
       }
@@ -1132,7 +1132,7 @@ GET /feeds/me?page=1&limit=10
         "joinedAt": "2026-05-09T10:00:00.000Z",
         "user": {
           "id": "1",
-          "fullName": "Nguyen Van A",
+          "name": "Nguyen Van A",
           "avatarUrl": null
         }
       }
@@ -1163,7 +1163,7 @@ GET /feeds/me?page=1&limit=10
         "createdAt": "2026-05-09T10:30:00.000Z",
         "sender": {
           "id": "2",
-          "fullName": "Tran Van C"
+          "name": "Tran Van C"
         }
       },
       "participants": [
@@ -1173,7 +1173,7 @@ GET /feeds/me?page=1&limit=10
           "isAdmin": false,
           "user": {
             "id": "1",
-            "fullName": "Nguyen Van A",
+            "name": "Nguyen Van A",
             "avatarUrl": null
           }
         }
@@ -1205,7 +1205,7 @@ GET /feeds/me?page=1&limit=10
         "joinedAt": "2026-05-09T10:00:00.000Z",
         "user": {
           "id": "1",
-          "fullName": "Nguyen Van A",
+          "name": "Nguyen Van A",
           "avatarUrl": null,
           "email": "a@gmail.com"
         }
@@ -1245,7 +1245,7 @@ GET /feeds/me?page=1&limit=10
     "updatedAt": "2026-05-09T10:30:00.000Z",
     "sender": {
       "id": "1",
-      "fullName": "Nguyen Van A",
+      "name": "Nguyen Van A",
       "avatarUrl": null
     }
   }
@@ -1283,7 +1283,7 @@ GET /feeds/me?page=1&limit=10
       "updatedAt": "2026-05-09T10:30:00.000Z",
       "sender": {
         "id": "1",
-        "fullName": "Nguyen Van A",
+        "name": "Nguyen Van A",
         "avatarUrl": null
       }
     }
@@ -1327,7 +1327,7 @@ Tat ca API duoi day:
   "message": "Khoa nguoi dung thanh cong",
   "user": {
     "id": "2",
-    "fullName": "Tran Van C",
+    "name": "Tran Van C",
     "email": "c@gmail.com",
     "role": "USER",
     "status": "BANNED",
@@ -1345,7 +1345,7 @@ Tat ca API duoi day:
   "message": "Mo khoa nguoi dung thanh cong",
   "user": {
     "id": "2",
-    "fullName": "Tran Van C",
+    "name": "Tran Van C",
     "email": "c@gmail.com",
     "role": "USER",
     "status": "ACTIVE",
@@ -1369,7 +1369,7 @@ Tat ca API duoi day:
   "data": [
     {
       "id": "1",
-      "fullName": "Nguyen Van A",
+      "name": "Nguyen Van A",
       "email": "a@gmail.com",
       "avatarUrl": null,
       "role": "USER",
@@ -1392,9 +1392,9 @@ Tat ca API duoi day:
 
 ```json
 {
-  "fullName": "Admin B",
+  "name": "Admin B",
   "email": "admin2@gmail.com",
-  "password": "123456",
+  "password": "12345678",
   "role": "ADMIN",
   "status": "ACTIVE"
 }
@@ -1407,7 +1407,7 @@ Tat ca API duoi day:
   "message": "Tao admin thanh cong",
   "user": {
     "id": "5",
-    "fullName": "Admin B",
+    "name": "Admin B",
     "email": "admin2@gmail.com",
     "role": "ADMIN",
     "status": "ACTIVE",
@@ -1433,7 +1433,7 @@ Tat ca API duoi day:
   "message": "Cap nhat quyen thanh cong",
   "user": {
     "id": "2",
-    "fullName": "Tran Van C",
+    "name": "Tran Van C",
     "email": "c@gmail.com",
     "role": "ADMIN",
     "updatedAt": "2026-05-09T10:00:00.000Z"
@@ -1529,7 +1529,7 @@ GET /admin/posts?page=1&limit=10&search=hello&status=PUBLISHED&sortBy=createdAt&
       "updatedAt": "2026-05-09T10:00:00.000Z",
       "user": {
         "id": "2",
-        "fullName": "Tran Van C",
+        "name": "Tran Van C",
         "email": "c@gmail.com"
       }
     }
@@ -1604,7 +1604,7 @@ GET /admin/posts?page=1&limit=10&search=hello&status=PUBLISHED&sortBy=createdAt&
       "createdAt": "2026-05-09T10:00:00.000Z",
       "admin": {
         "id": "5",
-        "fullName": "Admin B",
+        "name": "Admin B",
         "email": "admin2@gmail.com"
       }
     }

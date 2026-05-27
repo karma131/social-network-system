@@ -26,6 +26,18 @@ export class AuthService {
     private readonly mailService: MailService,
   ) {}
 
+  private async signAccessToken(payload: JwtPayload): Promise<string> {
+    const accessSecret = process.env.JWT_ACCESS_SECRET;
+    if (!accessSecret) {
+      throw new Error('Thiếu cấu hình JWT trong file .env');
+    }
+    const accessTokenExpiresIn = process.env.ACCESS_TOKEN_EXPIRES_IN || '15m';
+    return this.jwtService.signAsync(payload, {
+      secret: accessSecret,
+      expiresIn: accessTokenExpiresIn as any,
+    });
+  }
+
   async register(dto: RegisterDto) {
     const email = dto.email.trim().toLowerCase();
 
@@ -41,7 +53,7 @@ export class AuthService {
 
     const user = await this.prisma.user.create({
       data: {
-        fullName: dto.fullName.trim(),
+        name: dto.name.trim(),
         email,
         passwordHash,
         role: UserRole.USER,
@@ -49,7 +61,7 @@ export class AuthService {
       },
       select: {
         id: true,
-        fullName: true,
+        name: true,
         email: true,
         role: true,
         status: true,
@@ -57,34 +69,21 @@ export class AuthService {
       },
     });
 
-    // tạo token verify
-    const rawToken = crypto.randomBytes(32).toString('hex');
-
-    const tokenHash = await bcrypt.hash(rawToken, 10);
-
-    // lưu token DB
-    await this.prisma.emailVerificationToken.create({
-      data: {
-        userId: user.id,
-        tokenHash,
-        expiresAt: new Date(
-          Date.now() + 24 * 60 * 60 * 1000,
-        ),
-      },
+    const token = await this.signAccessToken({
+      sub: user.id.toString(),
+      email: user.email,
+      role: user.role,
     });
 
-    // gửi mail
-    await this.mailService.sendVerificationEmail(
-      user.email,
-      rawToken,
-    );
-
     return {
-      message:
-        'Đăng ký thành công. Kiểm tra email để xác thực.',
-      user: {
-        ...user,
-        id: user.id.toString(),
+      success: true,
+      message: 'Đăng ký thành công',
+      data: {
+        token,
+        user: {
+          ...user,
+          id: user.id.toString(),
+        },
       },
     };
   }
@@ -203,24 +202,18 @@ export class AuthService {
     });
 
     return {
-      message:
-        'Đăng nhập thành công',
-      accessToken,
-      refreshToken,
-      user: {
-        id: user.id.toString(),
-        fullName:
-          user.fullName,
-        email:
-          user.email,
-        role:
-          user.role,
-        status:
-          user.status,
-          emailVerified:
-           !!user.emailVerifiedAt,
-        emailVerifiedAt:
-          user.emailVerifiedAt,
+      success: true,
+      message: 'Đăng nhập thành công',
+      data: {
+        token: accessToken,
+        refreshToken,
+        user: {
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          status: user.status,
+        },
       },
     };
   }
@@ -600,41 +593,25 @@ export class AuthService {
     };
   }
 
-  async getMe(
-    userId: string,
-  ) {
-    const user =
-      await this.prisma.user.findUnique(
-        {
-          where: {
-            id:
-              BigInt(
-                userId,
-              ),
-          },
-          select: {
-            id: true,
-            fullName:
-              true,
-            email:
-              true,
-            avatarUrl:
-              true,
-            coverUrl:
-              true,
-            bio: true,
-            role: true,
-            status:
-              true,
-            emailVerifiedAt:
-              true,
-            lastLoginAt:
-              true,
-            createdAt:
-              true,
-          },
-        },
-      );
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: BigInt(userId),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true,
+        coverUrl: true,
+        bio: true,
+        role: true,
+        status: true,
+        emailVerifiedAt: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
 
     if (!user) {
       throw new UnauthorizedException(
@@ -643,9 +620,9 @@ export class AuthService {
     }
 
     return {
-      message:
-        'Lấy thông tin tài khoản thành công',
-      user: {
+      success: true,
+      message: 'Lấy thông tin tài khoản thành công',
+      data: {
         ...user,
         id: user.id.toString(),
       },

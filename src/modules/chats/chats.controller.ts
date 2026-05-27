@@ -52,6 +52,7 @@ export class ChatsController {
   }
 
   @ApiOperation({ summary: 'Lấy danh sách cuộc trò chuyện của tôi' })
+  @ApiBearerAuth('access-token')
   @Get()
   getMyConversations(@Req() req: RequestCoUser) {
     return this.chatsService.getMyConversations(req.user.sub);
