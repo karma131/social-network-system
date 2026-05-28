@@ -27,6 +27,7 @@ import { QueryUsersDto } from './dto/query-users.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { UpdateCoverDto } from './dto/update-cover.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateProfileExtendedDto } from './dto/update-profile-extended.dto';
 import { UsersService } from './users.service';
 
 type RequestCoUser = Request & {
@@ -68,6 +69,25 @@ export class UsersController {
     @Body() dto: UpdateProfileDto,
   ) {
     return this.usersService.updateMyProfile(req.user.sub, dto);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Lay extended profile cua user hien tai' })
+  @Get('me/profile')
+  getMyExtendedProfile(@Req() req: RequestCoUser) {
+    return this.usersService.getMyExtendedProfile(req.user.sub);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Cap nhat extended profile cua user hien tai' })
+  @Patch('me/profile')
+  updateMyExtendedProfile(
+    @Req() req: RequestCoUser,
+    @Body() dto: UpdateProfileExtendedDto,
+  ) {
+    return this.usersService.updateMyExtendedProfile(req.user.sub, dto);
   }
 
   @ApiBearerAuth('access-token')

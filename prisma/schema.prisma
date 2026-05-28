@@ -23,6 +23,7 @@ model User {
   updatedAt       DateTime   @updatedAt @map("updated_at")
   deletedAt       DateTime?  @map("deleted_at")
 
+  profile       Profile?
   refreshTokens RefreshToken[]
   uploads       Upload[]
   posts         Post[]
@@ -42,6 +43,20 @@ model User {
   emailVerificationTokens EmailVerificationToken[]
 
   @@map("users")
+}
+
+model Profile {
+  userId       BigInt   @id @map("user_id")
+  location     String?  @db.VarChar(120)
+  work         String?  @db.VarChar(120)
+  education    String?  @db.VarChar(120)
+  relationship String?  @db.VarChar(40)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
 }
 
 model RefreshToken {
