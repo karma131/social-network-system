@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { HashtagsModule } from '../hashtags/hashtags.module';
 import { PostsController } from './posts.controller';
 import { PostsService } from './posts.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, HashtagsModule],
   controllers: [PostsController],
   providers: [PostsService],
   exports: [PostsService],

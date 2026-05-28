@@ -16,6 +16,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ChatsModule } from './modules/chats/chats.module';
+import { HashtagsModule } from './modules/hashtags/hashtags.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ChatsModule } from './modules/chats/chats.module';
     FeedsModule,
     UploadsModule,
     ChatsModule,
+    HashtagsModule,
   ],
 })
 export class AppModule {}

@@ -6,44 +6,62 @@ import {
 } from '@nestjs/common';
 import { PostStatus, PostVisibility } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { HashtagsService } from '../hashtags/hashtags.service';
+import { extractHashtags } from '../hashtags/util/hashtag-parser';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 
 @Injectable()
 export class PostsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly hashtagsService: HashtagsService,
+  ) {}
 
   async createPost(userId: string, dto: CreatePostDto) {
     if (!dto.content?.trim()) {
       throw new BadRequestException('Nội dung bài viết không được để trống');
     }
 
-    const post = await this.prisma.post.create({
-      data: {
-        userId: BigInt(userId),
-        content: dto.content.trim(),
-        visibility: dto.visibility,
-        status: PostStatus.PUBLISHED,
-      },
-      select: {
-        id: true,
-        content: true,
-        visibility: true,
-        status: true,
-        commentCount: true,
-        reactionCount: true,
-        shareCount: true,
-        createdAt: true,
-        updatedAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatarUrl: true,
+    const content = dto.content.trim();
+
+    const post = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.post.create({
+        data: {
+          userId: BigInt(userId),
+          content,
+          visibility: dto.visibility,
+          status: PostStatus.PUBLISHED,
+        },
+        select: {
+          id: true,
+          content: true,
+          visibility: true,
+          status: true,
+          commentCount: true,
+          reactionCount: true,
+          shareCount: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatarUrl: true,
+            },
           },
         },
-      },
+      });
+
+      await this.hashtagsService.applyTagDiff(
+        tx,
+        created.id,
+        [],
+        extractHashtags(content),
+      );
+
+      return created;
     });
 
     return {
@@ -200,25 +218,41 @@ export class PostsService {
       throw new BadRequestException('Nội dung bài viết không được để trống');
     }
 
-    const updatedPost = await this.prisma.post.update({
-      where: {
-        id: BigInt(postId),
-      },
-      data: {
-        content: dto.content !== undefined ? dto.content.trim() : undefined,
-        visibility: dto.visibility,
-      },
-      select: {
-        id: true,
-        content: true,
-        visibility: true,
-        status: true,
-        commentCount: true,
-        reactionCount: true,
-        shareCount: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const nextContent =
+      dto.content !== undefined ? dto.content.trim() : undefined;
+
+    const updatedPost = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.post.update({
+        where: {
+          id: BigInt(postId),
+        },
+        data: {
+          content: nextContent,
+          visibility: dto.visibility,
+        },
+        select: {
+          id: true,
+          content: true,
+          visibility: true,
+          status: true,
+          commentCount: true,
+          reactionCount: true,
+          shareCount: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      if (nextContent !== undefined) {
+        await this.hashtagsService.applyTagDiff(
+          tx,
+          updated.id,
+          extractHashtags(post.content),
+          extractHashtags(nextContent),
+        );
+      }
+
+      return updated;
     });
 
     return {
