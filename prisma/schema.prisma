@@ -8,56 +8,53 @@ datasource db {
 }
 
 model User {
-  id                BigInt      @id @default(autoincrement())
-  name              String      @db.VarChar(60)
-  email             String      @unique @db.VarChar(255)
-  passwordHash      String      @map("password_hash")
-  avatarUrl         String?     @map("avatar_url")
-  coverUrl          String?     @map("cover_url")
-  bio               String?
-  role              UserRole    @default(USER)
-  status            UserStatus  @default(ACTIVE)
-  emailVerifiedAt   DateTime?   @map("email_verified_at")
-  lastLoginAt       DateTime?   @map("last_login_at")
-  createdAt         DateTime    @default(now()) @map("created_at")
-  updatedAt         DateTime    @updatedAt @map("updated_at")
-  deletedAt         DateTime?   @map("deleted_at")
+  id              BigInt     @id @default(autoincrement())
+  name            String     @db.VarChar(60)
+  email           String     @unique @db.VarChar(255)
+  passwordHash    String     @map("password_hash")
+  avatarUrl       String?    @map("avatar_url")
+  coverUrl        String?    @map("cover_url")
+  bio             String?
+  role            UserRole   @default(USER)
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?  @map("email_verified_at")
+  lastLoginAt     DateTime?  @map("last_login_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+  deletedAt       DateTime?  @map("deleted_at")
 
-  refreshTokens                 RefreshToken[]
-  uploads                       Upload[]
-  posts                         Post[]
-  comments                      Comment[]
-  reactions                     Reaction[]
+  refreshTokens RefreshToken[]
+  uploads       Upload[]
+  posts         Post[]
+  comments      Comment[]
+  reactions     Reaction[]
 
-  followers                     Follow[] @relation("UserFollowers")
-  following                     Follow[] @relation("UserFollowing")
-  notificationsReceived         Notification[] @relation("NotificationUser")
-  notificationsActed            Notification[] @relation("NotificationActor")
+  followers             Follow[]       @relation("UserFollowers")
+  following             Follow[]       @relation("UserFollowing")
+  friendsRequested      Friend[]       @relation("FriendRequester")
+  friendsReceived       Friend[]       @relation("FriendAddressee")
+  notificationsReceived Notification[] @relation("NotificationUser")
+  notificationsActed    Notification[] @relation("NotificationActor")
 
-  createdConversations          Conversation[] @relation("ConversationCreatedBy")
-  conversationParticipants      ConversationParticipant[]
-  sentMessages                  Message[] @relation("MessageSender")
-  messageReads                  MessageRead[]
+  adminLogs AdminLog[]
 
-  adminLogs                     AdminLog[]
-
-  passwordResetTokens           PasswordResetToken[]
-  emailVerificationTokens       EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 
   @@map("users")
 }
 
 model RefreshToken {
-  id         BigInt    @id @default(autoincrement())
-  userId     BigInt    @map("user_id")
-  tokenHash  String    @map("token_hash")
-  userAgent  String?   @map("user_agent")
-  ipAddress  String?   @map("ip_address") @db.VarChar(64)
-  expiresAt  DateTime  @map("expires_at")
-  revokedAt  DateTime? @map("revoked_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  tokenHash String    @map("token_hash")
+  userAgent String?   @map("user_agent")
+  ipAddress String?   @map("ip_address") @db.VarChar(64)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -74,9 +71,8 @@ model Upload {
   uploadType UploadType @default(OTHER) @map("upload_type")
   createdAt  DateTime   @default(now()) @map("created_at")
 
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  postMedia          PostMedia[]
-  messageAttachments MessageAttachment[]
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postMedia PostMedia[]
 
   @@index([userId])
   @@index([uploadType])
@@ -110,37 +106,37 @@ model Post {
 }
 
 model PostMedia {
-  id         BigInt    @id @default(autoincrement())
-  postId     BigInt    @map("post_id")
-  uploadId   BigInt?   @map("upload_id")
-  fileUrl    String    @map("file_url")
-  fileType   String    @default("image") @map("file_type") @db.VarChar(20)
-  sortOrder  Int       @default(0) @map("sort_order")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id        BigInt   @id @default(autoincrement())
+  postId    BigInt   @map("post_id")
+  uploadId  BigInt?  @map("upload_id")
+  fileUrl   String   @map("file_url")
+  fileType  String   @default("image") @map("file_type") @db.VarChar(20)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  post       Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  upload     Upload?   @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+  post   Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  upload Upload? @relation(fields: [uploadId], references: [id], onDelete: SetNull)
 
   @@index([postId])
   @@map("post_media")
 }
 
 model Comment {
-  id            BigInt         @id @default(autoincrement())
-  postId         BigInt         @map("post_id")
-  userId         BigInt         @map("user_id")
-  parentId       BigInt?        @map("parent_id")
-  content        String
-  status         CommentStatus  @default(ACTIVE)
-  createdAt      DateTime       @default(now()) @map("created_at")
-  updatedAt      DateTime       @updatedAt @map("updated_at")
-  deletedAt      DateTime?      @map("deleted_at")
+  id        BigInt        @id @default(autoincrement())
+  postId    BigInt        @map("post_id")
+  userId    BigInt        @map("user_id")
+  parentId  BigInt?       @map("parent_id")
+  content   String
+  status    CommentStatus @default(ACTIVE)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  deletedAt DateTime?     @map("deleted_at")
 
-  post           Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent         Comment?       @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies        Comment[]      @relation("CommentReplies")
-  notifications  Notification[]
+  post          Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent        Comment?       @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       Comment[]      @relation("CommentReplies")
+  notifications Notification[]
 
   @@index([postId])
   @@index([userId])
@@ -150,14 +146,14 @@ model Comment {
 }
 
 model Reaction {
-  id         BigInt        @id @default(autoincrement())
-  userId     BigInt        @map("user_id")
-  postId     BigInt        @map("post_id")
-  type       ReactionType
-  createdAt  DateTime      @default(now()) @map("created_at")
+  id        BigInt       @id @default(autoincrement())
+  userId    BigInt       @map("user_id")
+  postId    BigInt       @map("post_id")
+  type      ReactionType
+  createdAt DateTime     @default(now()) @map("created_at")
 
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post       Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@unique([userId, postId])
   @@index([postId])
@@ -167,13 +163,13 @@ model Reaction {
 }
 
 model Follow {
-  id           BigInt    @id @default(autoincrement())
-  followerId   BigInt    @map("follower_id")
-  followingId  BigInt    @map("following_id")
-  createdAt    DateTime  @default(now()) @map("created_at")
+  id          BigInt   @id @default(autoincrement())
+  followerId  BigInt   @map("follower_id")
+  followingId BigInt   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
 
-  follower     User      @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
-  following    User      @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+  follower  User @relation("UserFollowers", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
   @@index([followerId])
@@ -181,24 +177,39 @@ model Follow {
   @@map("follows")
 }
 
-model Notification {
-  id               BigInt            @id @default(autoincrement())
-  userId           BigInt            @map("user_id")
-  actorId          BigInt?           @map("actor_id")
-  type             NotificationType
-  postId           BigInt?           @map("post_id")
-  commentId        BigInt?           @map("comment_id")
-  messageId        BigInt?           @map("message_id")
-  contentSnapshot  String?           @map("content_snapshot")
-  isRead           Boolean           @default(false) @map("is_read")
-  readAt           DateTime?         @map("read_at")
-  createdAt        DateTime          @default(now()) @map("created_at")
+model Friend {
+  requesterId BigInt @map("requester_id")
+  requester   User   @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addresseeId BigInt @map("addressee_id")
+  addressee   User   @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
 
-  user             User              @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
-  actor            User?             @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
-  post             Post?             @relation(fields: [postId], references: [id], onDelete: Cascade)
-  comment          Comment?          @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  message          Message?          @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  status FriendStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@id([requesterId, addresseeId])
+  @@index([addresseeId])
+  @@index([status])
+  @@map("friends")
+}
+
+model Notification {
+  id              BigInt           @id @default(autoincrement())
+  userId          BigInt           @map("user_id")
+  actorId         BigInt?          @map("actor_id")
+  type            NotificationType
+  postId          BigInt?          @map("post_id")
+  commentId       BigInt?          @map("comment_id")
+  contentSnapshot String?          @map("content_snapshot")
+  isRead          Boolean          @default(false) @map("is_read")
+  readAt          DateTime?        @map("read_at")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  user    User     @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor   User?    @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isRead])
@@ -206,116 +217,49 @@ model Notification {
   @@map("notifications")
 }
 
-model Conversation {
-  id               BigInt                     @id @default(autoincrement())
-  type             ConversationType           @default(DIRECT)
-  title            String?                    @db.VarChar(255)
-  createdById      BigInt?                    @map("created_by")
-  lastMessageId    BigInt?                    @unique @map("last_message_id")
-  createdAt        DateTime                   @default(now()) @map("created_at")
-  updatedAt        DateTime                   @updatedAt @map("updated_at")
-
-  createdBy        User?                      @relation("ConversationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  lastMessage      Message?                   @relation("ConversationLastMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
-  participants     ConversationParticipant[]
-  messages         Message[]                  @relation("ConversationMessages")
-
-  @@index([type])
-  @@index([updatedAt(sort: Desc)])
-  @@map("conversations")
-}
-
-model ConversationParticipant {
-  id                 BigInt        @id @default(autoincrement())
-  conversationId     BigInt        @map("conversation_id")
-  userId             BigInt        @map("user_id")
-  joinedAt           DateTime      @default(now()) @map("joined_at")
-  leftAt             DateTime?     @map("left_at")
-  isAdmin            Boolean       @default(false) @map("is_admin")
-  lastReadMessageId  BigInt?       @unique @map("last_read_message_id")
-
-  conversation       Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lastReadMessage    Message?      @relation("ParticipantLastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
-
-  @@unique([conversationId, userId])
-  @@index([conversationId])
-  @@index([userId])
-  @@map("conversation_participants")
-}
-
 model Message {
-  id                       BigInt                     @id @default(autoincrement())
-  conversationId           BigInt                     @map("conversation_id")
-  senderId                 BigInt?                    @map("sender_id")
-  type                     MessageType                @default(TEXT)
-  content                  String?
-  replyToMessageId         BigInt?                    @map("reply_to_message_id")
-  status                   MessageStatus              @default(SENT)
-  createdAt                DateTime                   @default(now()) @map("created_at")
-  updatedAt                DateTime                   @updatedAt @map("updated_at")
-  deletedAt                DateTime?                  @map("deleted_at")
+  id             String      @id @default(uuid())
+  conversationId String      @map("conversation_id")
+  senderId       String?     @map("sender_id")
+  senderName     String      @map("sender_name")
+  content        String
+  type           MessageType @default(text)
+  replyToId      String?     @map("reply_to_id")
+  replyTo        Message?    @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        Message[]   @relation("MessageReply")
+  editedAt       DateTime?   @map("edited_at")
+  deleted        Boolean     @default(false)
+  createdAt      DateTime    @default(now()) @map("created_at")
 
-  conversation             Conversation               @relation("ConversationMessages", fields: [conversationId], references: [id], onDelete: Cascade)
-  sender                   User?                      @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
-  replyToMessage           Message?                   @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
-  replies                  Message[]                  @relation("MessageReplies")
+  reactions MessageReaction[]
 
-  attachments              MessageAttachment[]
-  reads                    MessageRead[]
-  notifications            Notification[]
-
-  conversationLastMessage  Conversation?              @relation("ConversationLastMessage")
-  participantLastReadFor   ConversationParticipant[]  @relation("ParticipantLastReadMessage")
-
-  @@index([conversationId])
-  @@index([senderId])
   @@index([conversationId, createdAt])
+  @@index([senderId])
   @@map("messages")
 }
 
-model MessageAttachment {
-  id         BigInt    @id @default(autoincrement())
-  messageId   BigInt    @map("message_id")
-  uploadId    BigInt?   @map("upload_id")
-  fileUrl     String    @map("file_url")
-  fileName    String?   @map("file_name") @db.VarChar(255)
-  mimeType    String?   @map("mime_type") @db.VarChar(100)
-  fileSize    BigInt?   @map("file_size")
-  createdAt   DateTime  @default(now()) @map("created_at")
+model MessageReaction {
+  messageId String  @map("message_id")
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String  @map("user_id")
+  userName  String  @map("user_name")
+  emoji     String
 
-  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  upload      Upload?   @relation(fields: [uploadId], references: [id], onDelete: SetNull)
-
+  @@id([messageId, userId])
   @@index([messageId])
-  @@map("message_attachments")
-}
-
-model MessageRead {
-  id         BigInt    @id @default(autoincrement())
-  messageId   BigInt    @map("message_id")
-  userId      BigInt    @map("user_id")
-  readAt      DateTime  @default(now()) @map("read_at")
-
-  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId])
-  @@index([userId])
-  @@index([messageId])
-  @@map("message_reads")
+  @@map("message_reactions")
 }
 
 model AdminLog {
-  id         BigInt    @id @default(autoincrement())
-  adminId    BigInt    @map("admin_id")
-  action     String    @db.VarChar(100)
-  targetType String    @map("target_type") @db.VarChar(50)
-  targetId   BigInt    @map("target_id")
+  id         BigInt   @id @default(autoincrement())
+  adminId    BigInt   @map("admin_id")
+  action     String   @db.VarChar(100)
+  targetType String   @map("target_type") @db.VarChar(50)
+  targetId   BigInt   @map("target_id")
   reason     String?
-  createdAt  DateTime  @default(now()) @map("created_at")
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  admin      User      @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  admin User @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId])
   @@index([targetType, targetId])
@@ -323,28 +267,28 @@ model AdminLog {
 }
 
 model PasswordResetToken {
-  id         BigInt    @id @default(autoincrement())
-  userId     BigInt    @map("user_id")
-  tokenHash  String    @map("token_hash")
-  expiresAt  DateTime  @map("expires_at")
-  usedAt     DateTime? @map("used_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("password_reset_tokens")
 }
 
 model EmailVerificationToken {
-  id         BigInt    @id @default(autoincrement())
-  userId     BigInt    @map("user_id")
-  tokenHash  String    @map("token_hash")
-  expiresAt  DateTime  @map("expires_at")
-  usedAt     DateTime? @map("used_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("email_verification_tokens")
@@ -404,21 +348,15 @@ enum UploadType {
   OTHER
 }
 
-enum ConversationType {
-  DIRECT
-  GROUP
-}
-
 enum MessageType {
-  TEXT
-  IMAGE
-  FILE
-  SYSTEM
+  text
+  image
+  file
+  video
+  system
 }
 
-enum MessageStatus {
-  SENT
-  DELIVERED
-  SEEN
-  DELETED
+enum FriendStatus {
+  PENDING
+  ACCEPTED
 }

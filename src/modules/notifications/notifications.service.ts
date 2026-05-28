@@ -20,7 +20,6 @@ export class NotificationsService {
         type: true,
         postId: true,
         commentId: true,
-        messageId: true,
         contentSnapshot: true,
         isRead: true,
         readAt: true,
@@ -44,7 +43,6 @@ export class NotificationsService {
         actorId: item.actorId ? item.actorId.toString() : null,
         postId: item.postId ? item.postId.toString() : null,
         commentId: item.commentId ? item.commentId.toString() : null,
-        messageId: item.messageId ? item.messageId.toString() : null,
         actor: item.actor
           ? {
               ...item.actor,

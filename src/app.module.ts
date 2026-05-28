@@ -10,6 +10,7 @@ import { PostsModule } from './modules/posts/posts.module';
 import { CommentsModule } from './modules/comments/comments.module';
 import { ReactionsModule } from './modules/reactions/reactions.module';
 import { FollowsModule } from './modules/follows/follows.module';
+import { FriendsModule } from './modules/friends/friends.module';
 import { FeedsModule } from './modules/feeds/feeds.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -25,6 +26,7 @@ import { ChatsModule } from './modules/chats/chats.module';
     CommentsModule,
     ReactionsModule,
     FollowsModule,
+    FriendsModule,
     NotificationsModule,
     FeedsModule,
     UploadsModule,
