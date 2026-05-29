@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post as HttpPost,
+  Query,
   Req,
   UploadedFile,
   UseGuards,
@@ -89,8 +90,12 @@ export class PostsController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lấy danh sách bài viết public' })
   @Get()
-  getPublicPosts(@Req() req: RequestMaybeUser) {
-    return this.postsService.getPublicPosts(req.user?.sub);
+  getPublicPosts(
+    @Req() req: RequestMaybeUser,
+    @Query('mine') mine?: string,
+    @Query('authorId') authorId?: string,
+  ) {
+    return this.postsService.getPublicPosts(req.user?.sub, mine, authorId);
   }
 
   @ApiBearerAuth('access-token')

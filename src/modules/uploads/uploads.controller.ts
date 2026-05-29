@@ -22,7 +22,10 @@ import type { Request } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UploadType } from '@prisma/client';
+import { multerDiskStorage } from './multer.config';
 import { UploadsService } from './uploads.service';
+
+const UPLOAD_LIMITS = { fileSize: 50 * 1024 * 1024 };
 
 type RequestCoUser = Request & {
   user: {
@@ -58,7 +61,9 @@ export class UploadsController {
     },
   })
   @Post('single')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', { storage: multerDiskStorage, limits: UPLOAD_LIMITS }),
+  )
   uploadSingle(
     @Req() req: RequestCoUser,
     @UploadedFile() file: Express.Multer.File,
@@ -93,7 +98,12 @@ export class UploadsController {
     },
   })
   @Post('multiple')
-  @UseInterceptors(FilesInterceptor('files', 10))
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      storage: multerDiskStorage,
+      limits: UPLOAD_LIMITS,
+    }),
+  )
   uploadMultiple(
     @Req() req: RequestCoUser,
     @UploadedFiles() files: Express.Multer.File[],

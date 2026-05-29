@@ -154,13 +154,29 @@ export class PostsService {
     };
   }
 
-  async getPublicPosts(viewerId?: string) {
-    const posts = await this.prisma.post.findMany({
-      where: {
+  async getPublicPosts(viewerId?: string, mine?: string, authorId?: string) {
+    let where: Prisma.PostWhereInput;
+    if (mine === '1' && viewerId) {
+      // Own posts — any visibility/status except deleted.
+      where = { userId: BigInt(viewerId), deletedAt: null };
+    } else if (authorId) {
+      // Another user's public posts.
+      where = {
+        userId: BigInt(authorId),
         status: PostStatus.PUBLISHED,
         visibility: PostVisibility.PUBLIC,
         deletedAt: null,
-      },
+      };
+    } else {
+      where = {
+        status: PostStatus.PUBLISHED,
+        visibility: PostVisibility.PUBLIC,
+        deletedAt: null,
+      };
+    }
+
+    const posts = await this.prisma.post.findMany({
+      where,
       orderBy: {
         createdAt: 'desc',
       },
