@@ -23,6 +23,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { ReactPostDto } from './dto/react-post.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { PinPostDto } from './dto/pin-post.dto';
 import { PostsService } from './posts.service';
 
 type RequestCoUser = Request & {
@@ -144,6 +145,26 @@ export class PostsController {
   @Delete(':id/react')
   unreact(@Param('id') id: string, @Req() req: RequestCoUser) {
     return this.postsService.unreactPost(id, req.user.sub);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Ghim/bỏ ghim bài viết' })
+  @HttpPost(':id/pin')
+  pin(
+    @Param('id') id: string,
+    @Req() req: RequestCoUser,
+    @Body() dto: PinPostDto,
+  ) {
+    return this.postsService.pinPost(id, req.user.sub, dto.pinned);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Xóa bài viết' })
+  @Delete(':id')
+  deletePost(@Param('id') id: string, @Req() req: RequestCoUser) {
+    return this.postsService.deletePost(id, req.user.sub);
   }
 
   @ApiBearerAuth('access-token')

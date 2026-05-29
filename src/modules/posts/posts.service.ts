@@ -26,6 +26,7 @@ const POST_SELECT = {
   reactionCount: true,
   shareCount: true,
   createdAt: true,
+  pinnedAt: true,
   user: { select: { id: true, name: true, avatarUrl: true } },
   media: {
     select: { fileUrl: true, fileType: true, sortOrder: true },
@@ -107,7 +108,7 @@ export class PostsService {
       commentsCount: post.commentCount,
       sharesCount: post.shareCount,
       sharedFrom: null,
-      pinnedAt: null,
+      pinnedAt: post.pinnedAt ? post.pinnedAt.getTime() : null,
       createdAt: post.createdAt.getTime(),
       tags: post.hashtags.map((h) => h.hashtag.tag),
     };
@@ -394,6 +395,46 @@ export class PostsService {
     return {
       message: 'Bình luận thành công',
       comment: this.toCommentDto(comment),
+    };
+  }
+
+  /** Loads a non-deleted post and asserts the caller owns it. */
+  private async assertPostOwner(postId: bigint, userId: string) {
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post || post.deletedAt) {
+      throw new NotFoundException('Không tìm thấy bài viết');
+    }
+    if (post.userId !== BigInt(userId)) {
+      throw new ForbiddenException('Bạn không có quyền với bài viết này');
+    }
+    return post;
+  }
+
+  async deletePost(postId: string, userId: string) {
+    const id = BigInt(postId);
+    await this.assertPostOwner(id, userId);
+
+    await this.prisma.post.update({
+      where: { id },
+      data: { deletedAt: new Date(), status: PostStatus.DELETED },
+    });
+
+    return { id: postId };
+  }
+
+  async pinPost(postId: string, userId: string, pinned: boolean) {
+    const id = BigInt(postId);
+    await this.assertPostOwner(id, userId);
+
+    const post = await this.prisma.post.update({
+      where: { id },
+      data: { pinnedAt: pinned ? new Date() : null },
+      select: POST_SELECT,
+    });
+
+    return {
+      message: pinned ? 'Ghim bài viết thành công' : 'Bỏ ghim thành công',
+      post: this.toPostDto(post, userId),
     };
   }
 }
