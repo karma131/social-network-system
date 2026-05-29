@@ -1,5 +1,7 @@
 import 'dotenv/config';
+import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
@@ -8,7 +10,10 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+  app.useStaticAssets(join(process.cwd(), uploadDir), { prefix: '/uploads/' });
 
   app.use(cookieParser());
 

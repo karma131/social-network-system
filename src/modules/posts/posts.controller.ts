@@ -7,12 +7,18 @@ import {
   Patch,
   Post as HttpPost,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
+import { UploadType } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
+import { multerDiskStorage } from '../uploads/multer.config';
+import { UploadsService } from '../uploads/uploads.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { ReactPostDto } from './dto/react-post.dto';
@@ -38,7 +44,10 @@ type RequestMaybeUser = Request & {
 @ApiTags('Posts')
 @Controller('posts')
 export class PostsController {
-  constructor(private readonly postsService: PostsService) {}
+  constructor(
+    private readonly postsService: PostsService,
+    private readonly uploadsService: UploadsService,
+  ) {}
 
   @ApiBearerAuth('access-token')
   @UseGuards(JwtAuthGuard)
@@ -46,6 +55,33 @@ export class PostsController {
   @HttpPost()
   createPost(@Req() req: RequestCoUser, @Body() dto: CreatePostDto) {
     return this.postsService.createPost(req.user.sub, dto);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Tải lên ảnh/video cho bài viết' })
+  @HttpPost('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: multerDiskStorage,
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  async upload(
+    @Req() req: RequestCoUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const { upload } = await this.uploadsService.saveFile(
+      req.user.sub,
+      file,
+      UploadType.POST_IMAGE,
+    );
+    const base = `${req.protocol}://${req.get('host')}`;
+    // Return just { url } so TransformInterceptor wraps it as data:{ url } —
+    // the FE proxy reads body.data.url. (A `message` key would make the
+    // interceptor treat the url string itself as `data`.)
+    return { url: `${base}${upload.fileUrl}` };
   }
 
   @ApiBearerAuth('access-token')
