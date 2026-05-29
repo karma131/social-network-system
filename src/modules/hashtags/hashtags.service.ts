@@ -65,14 +65,17 @@ export class HashtagsService {
 
     return {
       message: 'Lấy bài viết theo hashtag thành công',
-      posts: posts.map((post) => ({
-        ...post,
-        id: post.id.toString(),
-        user: {
-          ...post.user,
-          id: post.user.id.toString(),
-        },
-      })),
+      // Skip orphan rows (author deleted without cascade) so one bad row can't 500 the list.
+      posts: posts
+        .filter((post) => post.user)
+        .map((post) => ({
+          ...post,
+          id: post.id.toString(),
+          user: {
+            ...post.user,
+            id: post.user.id.toString(),
+          },
+        })),
     };
   }
 

@@ -4,8 +4,9 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 
 /**
  * Global error envelope: { success: false, message } at the right HTTP status.
@@ -15,13 +16,26 @@ import type { Response } from 'express';
  */
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(HttpExceptionFilter.name);
+
   catch(exception: unknown, host: ArgumentsHost): void {
-    const res = host.switchToHttp().getResponse<Response>();
+    const http = host.switchToHttp();
+    const res = http.getResponse<Response>();
+    const req = http.getRequest<Request>();
 
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
         : HttpStatus.INTERNAL_SERVER_ERROR;
+
+    // Log the real stack for unexpected (non-HTTP) errors — otherwise the
+    // generic "Internal server error" hides the cause in deployed logs.
+    if (!(exception instanceof HttpException)) {
+      this.logger.error(
+        `Unhandled error on ${req.method} ${req.url}`,
+        exception instanceof Error ? exception.stack : String(exception),
+      );
+    }
 
     res.status(status).json({ success: false, message: this.message(exception) });
   }

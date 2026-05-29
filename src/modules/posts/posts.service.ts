@@ -111,7 +111,9 @@ export class PostsService {
       sharedFrom: null,
       pinnedAt: post.pinnedAt ? post.pinnedAt.getTime() : null,
       createdAt: post.createdAt.getTime(),
-      tags: post.hashtags.map((h) => h.hashtag.tag),
+      tags: post.hashtags
+        .map((h) => h.hashtag?.tag)
+        .filter((t): t is string => !!t),
     };
   }
 
@@ -185,7 +187,11 @@ export class PostsService {
 
     return {
       message: 'Lấy danh sách bài viết thành công',
-      posts: posts.map((post) => this.toPostDto(post, viewerId)),
+      // Skip orphan rows (author deleted without cascade) so one bad row can't
+      // 500 the whole feed.
+      posts: posts
+        .filter((post) => post.user)
+        .map((post) => this.toPostDto(post, viewerId)),
     };
   }
 
@@ -378,7 +384,8 @@ export class PostsService {
 
     return {
       message: 'Lấy danh sách bình luận thành công',
-      comments: rows.map((row) => this.toCommentDto(row)),
+      // Skip orphan comments (author deleted without cascade).
+      comments: rows.filter((row) => row.user).map((row) => this.toCommentDto(row)),
     };
   }
 
