@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { PostVisibility } from '@prisma/client';
 
 export class UpdatePostDto {
@@ -10,7 +16,7 @@ export class UpdatePostDto {
   @IsOptional()
   @IsString()
   @MaxLength(5000)
-  content?: string;
+  text?: string;
 
   @ApiPropertyOptional({
     enum: PostVisibility,
@@ -20,4 +26,20 @@ export class UpdatePostDto {
   @IsOptional()
   @IsEnum(PostVisibility)
   visibility?: PostVisibility;
+
+  @ApiPropertyOptional({ description: 'URL ảnh đã upload' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @ApiPropertyOptional({ description: 'URL video đã upload' })
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
+
+  // Accepted for FE contract compatibility but not persisted (no BE column).
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsObject()
+  feeling?: Record<string, unknown>;
 }

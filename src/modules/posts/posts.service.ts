@@ -37,6 +37,21 @@ export class PostsService {
     private readonly hashtagsService: HashtagsService,
   ) {}
 
+  /** Persists FE-supplied media URLs as PostMedia rows (uploadId stays null). */
+  private async createMedia(
+    tx: Prisma.TransactionClient,
+    postId: bigint,
+    imageUrl?: string,
+    videoUrl?: string,
+  ) {
+    const rows: Prisma.PostMediaCreateManyInput[] = [];
+    if (imageUrl)
+      rows.push({ postId, fileUrl: imageUrl, fileType: 'image', sortOrder: 0 });
+    if (videoUrl)
+      rows.push({ postId, fileUrl: videoUrl, fileType: 'video', sortOrder: 1 });
+    if (rows.length) await tx.postMedia.createMany({ data: rows });
+  }
+
   /** Maps a BE post row to the frontend PostDTO contract. */
   private toPostDto(post: PostRow, viewerId?: string) {
     const reactions = {
@@ -82,22 +97,24 @@ export class PostsService {
   }
 
   async createPost(userId: string, dto: CreatePostDto) {
-    if (!dto.content?.trim()) {
+    if (!dto.text?.trim()) {
       throw new BadRequestException('Nội dung bài viết không được để trống');
     }
 
-    const content = dto.content.trim();
+    const content = dto.text.trim();
 
     const post = await this.prisma.$transaction(async (tx) => {
       const created = await tx.post.create({
         data: {
           userId: BigInt(userId),
           content,
-          visibility: dto.visibility,
+          visibility: dto.visibility ?? PostVisibility.PUBLIC,
           status: PostStatus.PUBLISHED,
         },
         select: { id: true },
       });
+
+      await this.createMedia(tx, created.id, dto.imageUrl, dto.videoUrl);
 
       await this.hashtagsService.applyTagDiff(
         tx,
@@ -190,15 +207,16 @@ export class PostsService {
     }
 
     if (
-      dto.content !== undefined &&
-      typeof dto.content === 'string' &&
-      !dto.content.trim()
+      dto.text !== undefined &&
+      typeof dto.text === 'string' &&
+      !dto.text.trim()
     ) {
       throw new BadRequestException('Nội dung bài viết không được để trống');
     }
 
-    const nextContent =
-      dto.content !== undefined ? dto.content.trim() : undefined;
+    const nextContent = dto.text !== undefined ? dto.text.trim() : undefined;
+    const touchesMedia =
+      dto.imageUrl !== undefined || dto.videoUrl !== undefined;
 
     const updatedPost = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.post.update({
@@ -219,6 +237,11 @@ export class PostsService {
           extractHashtags(post.content),
           extractHashtags(nextContent),
         );
+      }
+
+      if (touchesMedia) {
+        await tx.postMedia.deleteMany({ where: { postId: updated.id } });
+        await this.createMedia(tx, updated.id, dto.imageUrl, dto.videoUrl);
       }
 
       return tx.post.findUniqueOrThrow({
