@@ -367,6 +367,7 @@ enum CommentStatus {
 enum ReactionType {
   LIKE
   LOVE
+  CARE
   HAHA
   WOW
   SAD

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, PostStatus, PostVisibility } from '@prisma/client';
+import { Prisma, PostStatus, PostVisibility, ReactionType } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { HashtagsService } from '../hashtags/hashtags.service';
 import { extractHashtags } from '../hashtags/util/hashtag-parser';
@@ -253,6 +253,68 @@ export class PostsService {
     return {
       message: 'Cập nhật bài viết thành công',
       post: this.toPostDto(updatedPost, userId),
+    };
+  }
+
+  /** Maps a FE ReactionId (e.g. "haha") to the BE enum, or 400. */
+  private toReactionType(emoji: string): ReactionType {
+    const value = emoji.toUpperCase();
+    if (!(value in ReactionType)) {
+      throw new BadRequestException('Loại cảm xúc không hợp lệ');
+    }
+    return value as ReactionType;
+  }
+
+  private async assertPostExists(postId: bigint) {
+    const post = await this.prisma.post.findFirst({
+      where: { id: postId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!post) throw new NotFoundException('Không tìm thấy bài viết');
+  }
+
+  async reactPost(postId: string, userId: string, emoji: string) {
+    const type = this.toReactionType(emoji);
+    const id = BigInt(postId);
+    await this.assertPostExists(id);
+    const uid = BigInt(userId);
+
+    const post = await this.prisma.$transaction(async (tx) => {
+      await tx.reaction.upsert({
+        where: { userId_postId: { userId: uid, postId: id } },
+        create: { userId: uid, postId: id, type },
+        update: { type },
+      });
+      await tx.post.update({
+        where: { id },
+        data: { reactionCount: await tx.reaction.count({ where: { postId: id } }) },
+      });
+      return tx.post.findUniqueOrThrow({ where: { id }, select: POST_SELECT });
+    });
+
+    return {
+      message: 'Thả cảm xúc thành công',
+      post: this.toPostDto(post, userId),
+    };
+  }
+
+  async unreactPost(postId: string, userId: string) {
+    const id = BigInt(postId);
+    await this.assertPostExists(id);
+    const uid = BigInt(userId);
+
+    const post = await this.prisma.$transaction(async (tx) => {
+      await tx.reaction.deleteMany({ where: { userId: uid, postId: id } });
+      await tx.post.update({
+        where: { id },
+        data: { reactionCount: await tx.reaction.count({ where: { postId: id } }) },
+      });
+      return tx.post.findUniqueOrThrow({ where: { id }, select: POST_SELECT });
+    });
+
+    return {
+      message: 'Bỏ cảm xúc thành công',
+      post: this.toPostDto(post, userId),
     };
   }
 }

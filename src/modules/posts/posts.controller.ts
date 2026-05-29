@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -14,6 +15,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { ReactPostDto } from './dto/react-post.dto';
 import { PostsService } from './posts.service';
 
 type RequestCoUser = Request & {
@@ -67,6 +69,26 @@ export class PostsController {
   @Get(':id')
   getPostById(@Param('id') id: string, @Req() req: RequestMaybeUser) {
     return this.postsService.getPostById(id, req.user?.sub);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Thả/đổi cảm xúc cho bài viết' })
+  @HttpPost(':id/react')
+  react(
+    @Param('id') id: string,
+    @Req() req: RequestCoUser,
+    @Body() dto: ReactPostDto,
+  ) {
+    return this.postsService.reactPost(id, req.user.sub, dto.emoji);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Bỏ cảm xúc khỏi bài viết' })
+  @Delete(':id/react')
+  unreact(@Param('id') id: string, @Req() req: RequestCoUser) {
+    return this.postsService.unreactPost(id, req.user.sub);
   }
 
   @ApiBearerAuth('access-token')
