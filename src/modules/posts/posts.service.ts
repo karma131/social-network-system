@@ -4,12 +4,31 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PostStatus, PostVisibility } from '@prisma/client';
+import { Prisma, PostStatus, PostVisibility } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { HashtagsService } from '../hashtags/hashtags.service';
 import { extractHashtags } from '../hashtags/util/hashtag-parser';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+
+/** Shared select for every post-returning endpoint so they emit one shape. */
+const POST_SELECT = {
+  id: true,
+  content: true,
+  commentCount: true,
+  reactionCount: true,
+  shareCount: true,
+  createdAt: true,
+  user: { select: { id: true, name: true, avatarUrl: true } },
+  media: {
+    select: { fileUrl: true, fileType: true, sortOrder: true },
+    orderBy: { sortOrder: 'asc' },
+  },
+  reactions: { select: { type: true, userId: true } },
+  hashtags: { select: { hashtag: { select: { tag: true } } } },
+} satisfies Prisma.PostSelect;
+
+type PostRow = Prisma.PostGetPayload<{ select: typeof POST_SELECT }>;
 
 @Injectable()
 export class PostsService {
@@ -17,6 +36,50 @@ export class PostsService {
     private readonly prisma: PrismaService,
     private readonly hashtagsService: HashtagsService,
   ) {}
+
+  /** Maps a BE post row to the frontend PostDTO contract. */
+  private toPostDto(post: PostRow, viewerId?: string) {
+    const reactions = {
+      like: 0,
+      love: 0,
+      care: 0,
+      haha: 0,
+      wow: 0,
+      sad: 0,
+      angry: 0,
+    };
+    let myReaction: string | null = null;
+    for (const r of post.reactions) {
+      const key = r.type.toLowerCase() as keyof typeof reactions;
+      if (key in reactions) reactions[key] += 1;
+      if (viewerId && r.userId.toString() === viewerId) {
+        myReaction = r.type.toLowerCase();
+      }
+    }
+
+    const image = post.media.find((m) => m.fileType === 'image');
+    const video = post.media.find((m) => m.fileType === 'video');
+
+    return {
+      id: post.id.toString(),
+      authorId: post.user.id.toString(),
+      authorName: post.user.name,
+      authorAvatarUrl: post.user.avatarUrl ?? '',
+      text: post.content ?? '',
+      imageUrl: image?.fileUrl ?? null,
+      videoUrl: video?.fileUrl ?? null,
+      feeling: null,
+      isLive: false,
+      reactions,
+      myReaction,
+      commentsCount: post.commentCount,
+      sharesCount: post.shareCount,
+      sharedFrom: null,
+      pinnedAt: null,
+      createdAt: post.createdAt.getTime(),
+      tags: post.hashtags.map((h) => h.hashtag.tag),
+    };
+  }
 
   async createPost(userId: string, dto: CreatePostDto) {
     if (!dto.content?.trim()) {
@@ -33,25 +96,7 @@ export class PostsService {
           visibility: dto.visibility,
           status: PostStatus.PUBLISHED,
         },
-        select: {
-          id: true,
-          content: true,
-          visibility: true,
-          status: true,
-          commentCount: true,
-          reactionCount: true,
-          shareCount: true,
-          createdAt: true,
-          updatedAt: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              avatarUrl: true,
-            },
-          },
-        },
+        select: { id: true },
       });
 
       await this.hashtagsService.applyTagDiff(
@@ -61,23 +106,19 @@ export class PostsService {
         extractHashtags(content),
       );
 
-      return created;
+      return tx.post.findUniqueOrThrow({
+        where: { id: created.id },
+        select: POST_SELECT,
+      });
     });
 
     return {
       message: 'Tạo bài viết thành công',
-      post: {
-        ...post,
-        id: post.id.toString(),
-        user: {
-          ...post.user,
-          id: post.user.id.toString(),
-        },
-      },
+      post: this.toPostDto(post, userId),
     };
   }
 
-  async getPublicPosts() {
+  async getPublicPosts(viewerId?: string) {
     const posts = await this.prisma.post.findMany({
       where: {
         status: PostStatus.PUBLISHED,
@@ -87,36 +128,12 @@ export class PostsService {
       orderBy: {
         createdAt: 'desc',
       },
-      select: {
-        id: true,
-        content: true,
-        visibility: true,
-        status: true,
-        commentCount: true,
-        reactionCount: true,
-        shareCount: true,
-        createdAt: true,
-        updatedAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-      },
+      select: POST_SELECT,
     });
 
     return {
       message: 'Lấy danh sách bài viết thành công',
-      posts: posts.map((post) => ({
-        ...post,
-        id: post.id.toString(),
-        user: {
-          ...post.user,
-          id: post.user.id.toString(),
-        },
-      })),
+      posts: posts.map((post) => this.toPostDto(post, viewerId)),
     };
   }
 
@@ -129,53 +146,22 @@ export class PostsService {
       orderBy: {
         createdAt: 'desc',
       },
-      select: {
-        id: true,
-        content: true,
-        visibility: true,
-        status: true,
-        commentCount: true,
-        reactionCount: true,
-        shareCount: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: POST_SELECT,
     });
 
     return {
       message: 'Lấy bài viết của tôi thành công',
-      posts: posts.map((post) => ({
-        ...post,
-        id: post.id.toString(),
-      })),
+      posts: posts.map((post) => this.toPostDto(post, userId)),
     };
   }
 
-  async getPostById(postId: string) {
+  async getPostById(postId: string, viewerId?: string) {
     const post = await this.prisma.post.findFirst({
       where: {
         id: BigInt(postId),
         deletedAt: null,
       },
-      select: {
-        id: true,
-        content: true,
-        visibility: true,
-        status: true,
-        commentCount: true,
-        reactionCount: true,
-        shareCount: true,
-        createdAt: true,
-        updatedAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-            bio: true,
-          },
-        },
-      },
+      select: POST_SELECT,
     });
 
     if (!post) {
@@ -184,14 +170,7 @@ export class PostsService {
 
     return {
       message: 'Lấy chi tiết bài viết thành công',
-      post: {
-        ...post,
-        id: post.id.toString(),
-        user: {
-          ...post.user,
-          id: post.user.id.toString(),
-        },
-      },
+      post: this.toPostDto(post, viewerId),
     };
   }
 
@@ -230,17 +209,7 @@ export class PostsService {
           content: nextContent,
           visibility: dto.visibility,
         },
-        select: {
-          id: true,
-          content: true,
-          visibility: true,
-          status: true,
-          commentCount: true,
-          reactionCount: true,
-          shareCount: true,
-          createdAt: true,
-          updatedAt: true,
-        },
+        select: { id: true },
       });
 
       if (nextContent !== undefined) {
@@ -252,15 +221,15 @@ export class PostsService {
         );
       }
 
-      return updated;
+      return tx.post.findUniqueOrThrow({
+        where: { id: updated.id },
+        select: POST_SELECT,
+      });
     });
 
     return {
       message: 'Cập nhật bài viết thành công',
-      post: {
-        ...updatedPost,
-        id: updatedPost.id.toString(),
-      },
+      post: this.toPostDto(updatedPost, userId),
     };
   }
 }

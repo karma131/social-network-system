@@ -11,12 +11,21 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostsService } from './posts.service';
 
 type RequestCoUser = Request & {
   user: {
+    sub: string;
+    email: string;
+    role: string;
+  };
+};
+
+type RequestMaybeUser = Request & {
+  user?: {
     sub: string;
     email: string;
     role: string;
@@ -36,10 +45,12 @@ export class PostsController {
     return this.postsService.createPost(req.user.sub, dto);
   }
 
+  @ApiBearerAuth('access-token')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lấy danh sách bài viết public' })
   @Get()
-  getPublicPosts() {
-    return this.postsService.getPublicPosts();
+  getPublicPosts(@Req() req: RequestMaybeUser) {
+    return this.postsService.getPublicPosts(req.user?.sub);
   }
 
   @ApiBearerAuth('access-token')
@@ -50,10 +61,12 @@ export class PostsController {
     return this.postsService.getMyPosts(req.user.sub);
   }
 
+  @ApiBearerAuth('access-token')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lấy chi tiết một bài viết' })
   @Get(':id')
-  getPostById(@Param('id') id: string) {
-    return this.postsService.getPostById(id);
+  getPostById(@Param('id') id: string, @Req() req: RequestMaybeUser) {
+    return this.postsService.getPostById(id, req.user?.sub);
   }
 
   @ApiBearerAuth('access-token')
