@@ -4,12 +4,19 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, PostStatus, PostVisibility, ReactionType } from '@prisma/client';
+import {
+  Prisma,
+  PostStatus,
+  PostVisibility,
+  ReactionType,
+  CommentStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { HashtagsService } from '../hashtags/hashtags.service';
 import { extractHashtags } from '../hashtags/util/hashtag-parser';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
+import { CreateCommentDto } from './dto/create-comment.dto';
 
 /** Shared select for every post-returning endpoint so they emit one shape. */
 const POST_SELECT = {
@@ -29,6 +36,16 @@ const POST_SELECT = {
 } satisfies Prisma.PostSelect;
 
 type PostRow = Prisma.PostGetPayload<{ select: typeof POST_SELECT }>;
+
+const COMMENT_SELECT = {
+  id: true,
+  postId: true,
+  content: true,
+  createdAt: true,
+  user: { select: { id: true, name: true, avatarUrl: true } },
+} satisfies Prisma.CommentSelect;
+
+type CommentRow = Prisma.CommentGetPayload<{ select: typeof COMMENT_SELECT }>;
 
 @Injectable()
 export class PostsService {
@@ -315,6 +332,68 @@ export class PostsService {
     return {
       message: 'Bỏ cảm xúc thành công',
       post: this.toPostDto(post, userId),
+    };
+  }
+
+  private toCommentDto(row: CommentRow) {
+    return {
+      id: row.id.toString(),
+      postId: row.postId.toString(),
+      authorId: row.user.id.toString(),
+      authorName: row.user.name,
+      authorAvatarUrl: row.user.avatarUrl ?? '',
+      text: row.content,
+      imageUrl: null,
+      createdAt: row.createdAt.getTime(),
+    };
+  }
+
+  async listComments(postId: string) {
+    const id = BigInt(postId);
+    await this.assertPostExists(id);
+
+    const rows = await this.prisma.comment.findMany({
+      where: { postId: id, status: CommentStatus.ACTIVE, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+      select: COMMENT_SELECT,
+    });
+
+    return {
+      message: 'Lấy danh sách bình luận thành công',
+      comments: rows.map((row) => this.toCommentDto(row)),
+    };
+  }
+
+  async addComment(postId: string, userId: string, dto: CreateCommentDto) {
+    if (!dto.text?.trim()) {
+      throw new BadRequestException('Nội dung bình luận không được để trống');
+    }
+    const id = BigInt(postId);
+    await this.assertPostExists(id);
+
+    const comment = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.comment.create({
+        data: {
+          postId: id,
+          userId: BigInt(userId),
+          content: dto.text.trim(),
+        },
+        select: COMMENT_SELECT,
+      });
+      await tx.post.update({
+        where: { id },
+        data: {
+          commentCount: await tx.comment.count({
+            where: { postId: id, status: CommentStatus.ACTIVE, deletedAt: null },
+          }),
+        },
+      });
+      return created;
+    });
+
+    return {
+      message: 'Bình luận thành công',
+      comment: this.toCommentDto(comment),
     };
   }
 }

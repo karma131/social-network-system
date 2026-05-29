@@ -16,6 +16,7 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { ReactPostDto } from './dto/react-post.dto';
+import { CreateCommentDto } from './dto/create-comment.dto';
 import { PostsService } from './posts.service';
 
 type RequestCoUser = Request & {
@@ -69,6 +70,24 @@ export class PostsController {
   @Get(':id')
   getPostById(@Param('id') id: string, @Req() req: RequestMaybeUser) {
     return this.postsService.getPostById(id, req.user?.sub);
+  }
+
+  @ApiOperation({ summary: 'Lấy bình luận của bài viết' })
+  @Get(':id/comments')
+  listComments(@Param('id') id: string) {
+    return this.postsService.listComments(id);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Bình luận bài viết' })
+  @HttpPost(':id/comments')
+  comment(
+    @Param('id') id: string,
+    @Req() req: RequestCoUser,
+    @Body() dto: CreateCommentDto,
+  ) {
+    return this.postsService.addComment(id, req.user.sub, dto);
   }
 
   @ApiBearerAuth('access-token')
