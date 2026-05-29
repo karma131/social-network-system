@@ -42,6 +42,7 @@ const COMMENT_SELECT = {
   id: true,
   postId: true,
   content: true,
+  imageUrl: true,
   createdAt: true,
   user: { select: { id: true, name: true, avatarUrl: true } },
 } satisfies Prisma.CommentSelect;
@@ -344,7 +345,7 @@ export class PostsService {
       authorName: row.user.name,
       authorAvatarUrl: row.user.avatarUrl ?? '',
       text: row.content,
-      imageUrl: null,
+      imageUrl: row.imageUrl ?? null,
       createdAt: row.createdAt.getTime(),
     };
   }
@@ -366,8 +367,9 @@ export class PostsService {
   }
 
   async addComment(postId: string, userId: string, dto: CreateCommentDto) {
-    if (!dto.text?.trim()) {
-      throw new BadRequestException('Nội dung bình luận không được để trống');
+    const text = dto.text?.trim() ?? '';
+    if (!text && !dto.imageUrl) {
+      throw new BadRequestException('Bình luận phải có nội dung hoặc ảnh');
     }
     const id = BigInt(postId);
     await this.assertPostExists(id);
@@ -377,7 +379,8 @@ export class PostsService {
         data: {
           postId: id,
           userId: BigInt(userId),
-          content: dto.text.trim(),
+          content: text,
+          imageUrl: dto.imageUrl ?? null,
         },
         select: COMMENT_SELECT,
       });
