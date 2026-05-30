@@ -34,6 +34,7 @@ import { HashtagsModule } from './modules/hashtags/hashtags.module';
     UploadsModule,
     ChatsModule,
     HashtagsModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}
