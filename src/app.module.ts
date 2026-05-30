@@ -13,6 +13,7 @@ import { FollowsModule } from './modules/follows/follows.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { FeedsModule } from './modules/feeds/feeds.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { ChatsModule } from './modules/chats/chats.module';
