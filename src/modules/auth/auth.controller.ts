@@ -5,12 +5,13 @@ import {
   Headers,
   Post,
   Req,
+  Res,
   UnauthorizedException,
   UseGuards,
   Param,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response, CookieOptions } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -26,45 +27,78 @@ type AuthenticatedRequest = Request & {
   };
 };
 
+const TOKEN_COOKIE_OPTIONS: CookieOptions = {
+  httpOnly: true,
+  sameSite: 'lax',
+  secure: process.env.NODE_ENV === 'production',
+  maxAge: 24 * 60 * 60 * 1000,
+  path: '/',
+};
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.register(dto);
+    if (result?.data?.token) {
+      res.cookie('token', result.data.token, TOKEN_COOKIE_OPTIONS);
+    }
+    return result;
   }
 
   @Post('login')
-  login(
+  async login(
     @Body() dto: LoginDto,
+    @Headers('user-agent') userAgent: string | undefined,
     @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const ipAddress =
       (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket.remoteAddress ||
       '';
 
-    return this.authService.login(dto, ipAddress);
+    const result = await this.authService.login(dto, userAgent, ipAddress);
+    if (result?.data?.token) {
+      res.cookie('token', result.data.token, TOKEN_COOKIE_OPTIONS);
+    }
+    return result;
   }
 
   @Post('refresh')
-  refresh(@Body() dto: RefreshTokenDto) {
+  async refresh(
+    @Body() dto: RefreshTokenDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     if (!dto.refreshToken) {
       throw new UnauthorizedException('Thieu refresh token');
     }
 
-    return this.authService.refreshToken(dto.refreshToken);
+    const result = await this.authService.refreshToken(dto.refreshToken);
+    if (result?.accessToken) {
+      res.cookie('token', result.accessToken, TOKEN_COOKIE_OPTIONS);
+    }
+    return result;
   }
 
   @Post('logout')
-  logout(@Body() dto: RefreshTokenDto) {
+  async logout(
+    @Body() dto: RefreshTokenDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     if (!dto.refreshToken) {
       throw new UnauthorizedException('Thieu refresh token');
     }
 
-    return this.authService.logout(dto.refreshToken);
+    const result = await this.authService.logout(dto.refreshToken);
+    res.clearCookie('token', { path: '/' });
+    return result;
   }
 
   @ApiBearerAuth('access-token')
@@ -73,21 +107,14 @@ export class AuthController {
   me(@Req() req: AuthenticatedRequest) {
     return this.authService.getMe(req.user.sub);
   }
+
   @Get('verify-email/:token')
-verifyEmail(
-  @Param('token') token: string,
-) {
-  return this.authService.verifyEmail(token);
-}
+  verifyEmail(@Param('token') token: string) {
+    return this.authService.verifyEmail(token);
+  }
 
-@Post('resend-verification')
-resendVerification(
-  @Body() dto: ResendVerificationDto,
-) {
-  return this.authService.resendVerification(
-    dto.email,
-  );
-}
-
-
+  @Post('resend-verification')
+  resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerification(dto.email);
+  }
 }

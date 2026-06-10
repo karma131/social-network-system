@@ -12,6 +12,7 @@ import { QueryUsersDto } from './dto/query-users.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { UpdateCoverDto } from './dto/update-cover.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateProfileExtendedDto } from './dto/update-profile-extended.dto';
 import { mapPrivateUser, mapPublicUser } from './user-response.mapper';
 
 const PRIVATE_USER_SELECT = {
@@ -100,6 +101,118 @@ export class UsersService {
       message: 'Lay thong tin nguoi dung thanh cong',
       data: mapPrivateUser(user),
     };
+  }
+
+  async getMyExtendedProfile(userId: string) {
+    await this.ensureActiveAccount(userId);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: BigInt(userId) },
+      select: {
+        name: true,
+        bio: true,
+        avatarUrl: true,
+        coverUrl: true,
+        profile: {
+          select: {
+            location: true,
+            work: true,
+            education: true,
+            relationship: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Khong tim thay nguoi dung');
+    }
+
+    return {
+      success: true,
+      data: {
+        name: user.name,
+        bio: user.bio ?? '',
+        avatarUrl: user.avatarUrl ?? '',
+        coverUrl: user.coverUrl ?? '',
+        location: user.profile?.location ?? '',
+        work: user.profile?.work ?? '',
+        education: user.profile?.education ?? '',
+        relationship: user.profile?.relationship ?? '',
+      },
+    };
+  }
+
+  async updateMyExtendedProfile(userId: string, dto: UpdateProfileExtendedDto) {
+    await this.ensureActiveAccount(userId);
+
+    const userData: {
+      name?: string;
+      bio?: string | null;
+      avatarUrl?: string | null;
+      coverUrl?: string | null;
+    } = {};
+
+    if (dto.name !== undefined) {
+      const name = dto.name.trim();
+      if (!name) {
+        throw new BadRequestException('Ho ten khong duoc de trong');
+      }
+      userData.name = name;
+    }
+    if (dto.bio !== undefined) {
+      const bio = dto.bio.trim();
+      userData.bio = bio || null;
+    }
+    if (dto.avatarUrl !== undefined) {
+      const v = dto.avatarUrl.trim();
+      userData.avatarUrl = v || null;
+    }
+    if (dto.coverUrl !== undefined) {
+      const v = dto.coverUrl.trim();
+      userData.coverUrl = v || null;
+    }
+
+    const profileFields: {
+      location?: string | null;
+      work?: string | null;
+      education?: string | null;
+      relationship?: string | null;
+    } = {};
+    if (dto.location !== undefined) {
+      const v = dto.location.trim();
+      profileFields.location = v || null;
+    }
+    if (dto.work !== undefined) {
+      const v = dto.work.trim();
+      profileFields.work = v || null;
+    }
+    if (dto.education !== undefined) {
+      const v = dto.education.trim();
+      profileFields.education = v || null;
+    }
+    if (dto.relationship !== undefined) {
+      const v = dto.relationship.trim();
+      profileFields.relationship = v || null;
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (Object.keys(userData).length > 0) {
+        await tx.user.update({
+          where: { id: BigInt(userId) },
+          data: userData,
+        });
+      }
+      if (Object.keys(profileFields).length > 0) {
+        await tx.profile.upsert({
+          where: { userId: BigInt(userId) },
+          create: { userId: BigInt(userId), ...profileFields },
+          update: profileFields,
+        });
+      }
+    });
+
+    return this.getMyExtendedProfile(userId);
   }
 
   async updateMyProfile(userId: string, dto: UpdateProfileDto) {

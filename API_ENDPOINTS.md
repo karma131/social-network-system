@@ -1649,3 +1649,15 @@ GET /admin/posts?page=1&limit=10&search=hello&status=PUBLISHED&sortBy=createdAt&
 - Chat API hien tai chi gui text, chua co endpoint gui image/file message
 - `GET /posts/:id` hien chi check `deletedAt`, frontend khong nen mac dinh route nay da tu xu ly privacy
 - Upload tra relative path, frontend can ghep voi host backend de hien thi anh/file
+
+## Reports (báo cáo bài viết)
+
+Người dùng báo cáo bài viết; admin xử lý realtime qua socket `/report`
+(BE là nguồn dữ liệu, socket chỉ relay). Khi duyệt sẽ xóa bài (status DELETED).
+
+| Method | Endpoint | Mô tả | Auth |
+|--------|----------|-------|------|
+| POST | `/reports` | Người dùng gửi báo cáo `{ postId, postOwnerId?, reason, postSnapshot? }` | User |
+| GET | `/reports?status=pending\|approved\|rejected` | Danh sách báo cáo | Admin |
+| POST | `/reports/:id/approve` | Duyệt báo cáo + xóa bài viết | Admin |
+| POST | `/reports/:id/reject` | Từ chối báo cáo | Admin |
