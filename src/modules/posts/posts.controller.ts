@@ -12,7 +12,12 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { UploadType } from '@prisma/client';
@@ -114,10 +119,12 @@ export class PostsController {
     return this.postsService.getPostById(id, req.user?.sub);
   }
 
+  @ApiBearerAuth('access-token')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lấy bình luận của bài viết' })
   @Get(':id/comments')
-  listComments(@Param('id') id: string) {
-    return this.postsService.listComments(id);
+  listComments(@Param('id') id: string, @Req() req: RequestMaybeUser) {
+    return this.postsService.listComments(id, req.user?.sub);
   }
 
   @ApiBearerAuth('access-token')

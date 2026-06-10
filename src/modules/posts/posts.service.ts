@@ -22,6 +22,7 @@ import { CreateCommentDto } from './dto/create-comment.dto';
 const POST_SELECT = {
   id: true,
   content: true,
+  visibility: true,
   commentCount: true,
   reactionCount: true,
   shareCount: true,
@@ -103,6 +104,7 @@ export class PostsService {
       imageUrl: image?.fileUrl ?? null,
       videoUrl: video?.fileUrl ?? null,
       feeling: null,
+      visibility: post.visibility,
       isLive: false,
       reactions,
       myReaction,
@@ -161,19 +163,31 @@ export class PostsService {
     if (mine === '1' && viewerId) {
       // Own posts — any visibility/status except deleted.
       where = { userId: BigInt(viewerId), deletedAt: null };
-    } else if (authorId) {
-      // Another user's public posts.
-      where = {
-        userId: BigInt(authorId),
-        status: PostStatus.PUBLISHED,
-        visibility: PostVisibility.PUBLIC,
-        deletedAt: null,
-      };
     } else {
+      const visibilityFilter: Prisma.PostWhereInput[] = [
+        { visibility: PostVisibility.PUBLIC },
+      ];
+
+      if (viewerId) {
+        const viewerUserId = BigInt(viewerId);
+        const following = await this.prisma.follow.findMany({
+          where: { followerId: viewerUserId },
+          select: { followingId: true },
+        });
+        visibilityFilter.push(
+          { userId: viewerUserId },
+          {
+            visibility: PostVisibility.FOLLOWERS,
+            userId: { in: following.map((item) => item.followingId) },
+          },
+        );
+      }
+
       where = {
+        ...(authorId ? { userId: BigInt(authorId) } : {}),
         status: PostStatus.PUBLISHED,
-        visibility: PostVisibility.PUBLIC,
         deletedAt: null,
+        OR: visibilityFilter,
       };
     }
 
@@ -225,6 +239,8 @@ export class PostsService {
     if (!post) {
       throw new NotFoundException('Không tìm thấy bài viết');
     }
+
+    await this.assertCanViewPost(post.id, viewerId, post);
 
     return {
       message: 'Lấy chi tiết bài viết thành công',
@@ -306,18 +322,50 @@ export class PostsService {
     return value as ReactionType;
   }
 
-  private async assertPostExists(postId: bigint) {
-    const post = await this.prisma.post.findFirst({
-      where: { id: postId, deletedAt: null },
-      select: { id: true },
-    });
+  private async assertCanViewPost(
+    postId: bigint,
+    viewerId?: string,
+    selectedPost?: Pick<PostRow, 'id' | 'visibility' | 'user'>,
+  ) {
+    const post =
+      selectedPost ??
+      (await this.prisma.post.findFirst({
+        where: { id: postId, deletedAt: null },
+        select: {
+          id: true,
+          visibility: true,
+          user: { select: { id: true, name: true, avatarUrl: true } },
+        },
+      }));
     if (!post) throw new NotFoundException('Không tìm thấy bài viết');
+
+    if (post.visibility === PostVisibility.PUBLIC) return;
+    if (!viewerId) {
+      throw new ForbiddenException('Bạn không có quyền xem bài viết này');
+    }
+
+    const viewerUserId = BigInt(viewerId);
+    if (post.user.id === viewerUserId) return;
+    if (post.visibility === PostVisibility.PRIVATE) {
+      throw new ForbiddenException('Bạn không có quyền xem bài viết này');
+    }
+
+    const followsAuthor = await this.prisma.follow.findFirst({
+      where: {
+        followerId: viewerUserId,
+        followingId: post.user.id,
+      },
+      select: { followerId: true },
+    });
+    if (!followsAuthor) {
+      throw new ForbiddenException('Bạn không có quyền xem bài viết này');
+    }
   }
 
   async reactPost(postId: string, userId: string, emoji: string) {
     const type = this.toReactionType(emoji);
     const id = BigInt(postId);
-    await this.assertPostExists(id);
+    await this.assertCanViewPost(id, userId);
     const uid = BigInt(userId);
 
     const post = await this.prisma.$transaction(async (tx) => {
@@ -328,7 +376,9 @@ export class PostsService {
       });
       await tx.post.update({
         where: { id },
-        data: { reactionCount: await tx.reaction.count({ where: { postId: id } }) },
+        data: {
+          reactionCount: await tx.reaction.count({ where: { postId: id } }),
+        },
       });
       return tx.post.findUniqueOrThrow({ where: { id }, select: POST_SELECT });
     });
@@ -341,14 +391,16 @@ export class PostsService {
 
   async unreactPost(postId: string, userId: string) {
     const id = BigInt(postId);
-    await this.assertPostExists(id);
+    await this.assertCanViewPost(id, userId);
     const uid = BigInt(userId);
 
     const post = await this.prisma.$transaction(async (tx) => {
       await tx.reaction.deleteMany({ where: { userId: uid, postId: id } });
       await tx.post.update({
         where: { id },
-        data: { reactionCount: await tx.reaction.count({ where: { postId: id } }) },
+        data: {
+          reactionCount: await tx.reaction.count({ where: { postId: id } }),
+        },
       });
       return tx.post.findUniqueOrThrow({ where: { id }, select: POST_SELECT });
     });
@@ -372,9 +424,9 @@ export class PostsService {
     };
   }
 
-  async listComments(postId: string) {
+  async listComments(postId: string, viewerId?: string) {
     const id = BigInt(postId);
-    await this.assertPostExists(id);
+    await this.assertCanViewPost(id, viewerId);
 
     const rows = await this.prisma.comment.findMany({
       where: { postId: id, status: CommentStatus.ACTIVE, deletedAt: null },
@@ -385,7 +437,9 @@ export class PostsService {
     return {
       message: 'Lấy danh sách bình luận thành công',
       // Skip orphan comments (author deleted without cascade).
-      comments: rows.filter((row) => row.user).map((row) => this.toCommentDto(row)),
+      comments: rows
+        .filter((row) => row.user)
+        .map((row) => this.toCommentDto(row)),
     };
   }
 
@@ -395,7 +449,7 @@ export class PostsService {
       throw new BadRequestException('Bình luận phải có nội dung hoặc ảnh');
     }
     const id = BigInt(postId);
-    await this.assertPostExists(id);
+    await this.assertCanViewPost(id, userId);
 
     const comment = await this.prisma.$transaction(async (tx) => {
       const created = await tx.comment.create({
@@ -411,7 +465,11 @@ export class PostsService {
         where: { id },
         data: {
           commentCount: await tx.comment.count({
-            where: { postId: id, status: CommentStatus.ACTIVE, deletedAt: null },
+            where: {
+              postId: id,
+              status: CommentStatus.ACTIVE,
+              deletedAt: null,
+            },
           }),
         },
       });
