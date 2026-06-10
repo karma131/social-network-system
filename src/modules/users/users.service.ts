@@ -4,9 +4,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole, UserStatus } from '@prisma/client';
+import { UploadType, UserRole, UserStatus } from '@prisma/client';
 import { Express } from 'express';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CloudinaryService } from '../uploads/cloudinary.service';
 import { QueryUsersDto } from './dto/query-users.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { UpdateCoverDto } from './dto/update-cover.dto';
@@ -39,7 +40,10 @@ const PUBLIC_USER_SELECT = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinaryService: CloudinaryService,
+  ) {}
 
   private async ensureActiveAccount(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -56,18 +60,28 @@ export class UsersService {
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException('Tai khoan khong duoc phep thuc hien thao tac nay');
+      throw new ForbiddenException(
+        'Tai khoan khong duoc phep thuc hien thao tac nay',
+      );
     }
 
     return user;
   }
 
-  private fileToUrl(file?: Express.Multer.File) {
+  private async fileToUrl(
+    file: Express.Multer.File | undefined,
+    uploadType: UploadType,
+  ) {
     if (!file) {
       return undefined;
     }
 
-    return `/${process.env.UPLOAD_DIR || 'uploads'}/${file.filename}`;
+    const uploadedFile = await this.cloudinaryService.uploadFile(
+      file,
+      uploadType,
+    );
+
+    return uploadedFile.secure_url;
   }
 
   async getMyProfile(userId: string) {
@@ -241,7 +255,8 @@ export class UsersService {
   ) {
     await this.ensureActiveAccount(userId);
 
-    const avatarUrl = this.fileToUrl(file) || dto.avatarUrl?.trim();
+    const avatarUrl =
+      (await this.fileToUrl(file, UploadType.AVATAR)) || dto.avatarUrl?.trim();
     if (!avatarUrl) {
       throw new BadRequestException('Can cung cap avatarUrl hoac file avatar');
     }
@@ -265,7 +280,8 @@ export class UsersService {
   ) {
     await this.ensureActiveAccount(userId);
 
-    const coverUrl = this.fileToUrl(file) || dto.coverUrl?.trim();
+    const coverUrl =
+      (await this.fileToUrl(file, UploadType.COVER)) || dto.coverUrl?.trim();
     if (!coverUrl) {
       throw new BadRequestException('Can cung cap coverUrl hoac file cover');
     }

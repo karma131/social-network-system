@@ -8,6 +8,7 @@ import {
   Res,
   UnauthorizedException,
   UseGuards,
+  Param,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request, Response, CookieOptions } from 'express';
@@ -16,6 +17,7 @@ import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
 
 type AuthenticatedRequest = Request & {
   user: {
@@ -53,7 +55,7 @@ export class AuthController {
   @Post('login')
   async login(
     @Body() dto: LoginDto,
-    @Headers('user-agent') userAgent: string,
+    @Headers('user-agent') userAgent: string | undefined,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
@@ -104,5 +106,15 @@ export class AuthController {
   @Get('me')
   me(@Req() req: AuthenticatedRequest) {
     return this.authService.getMe(req.user.sub);
+  }
+
+  @Get('verify-email/:token')
+  verifyEmail(@Param('token') token: string) {
+    return this.authService.verifyEmail(token);
+  }
+
+  @Post('resend-verification')
+  resendVerification(@Body() dto: ResendVerificationDto) {
+    return this.authService.resendVerification(dto.email);
   }
 }

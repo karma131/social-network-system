@@ -1,4 +1,4 @@
-import { diskStorage } from 'multer';
+import { diskStorage, memoryStorage } from 'multer';
 import { extname } from 'path';
 import { mkdirSync } from 'fs';
 
@@ -15,3 +15,12 @@ export const multerDiskStorage = diskStorage({
     callback(null, fileName);
   },
 });
+
+export const multerCloudStorage = memoryStorage();
+
+export const multerCloudinaryOptions = {
+  storage: multerCloudStorage,
+  limits: {
+    fileSize: Number(process.env.MAX_UPLOAD_FILE_SIZE_MB || 100) * 1024 * 1024,
+  },
+};

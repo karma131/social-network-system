@@ -20,7 +20,8 @@
 BEGIN;
 CREATE TYPE "MessageType_new" AS ENUM ('text', 'image', 'file', 'video', 'system');
 ALTER TABLE "public"."messages" ALTER COLUMN "type" DROP DEFAULT;
-ALTER TABLE "messages" ALTER COLUMN "type" TYPE "MessageType_new" USING ("type"::text::"MessageType_new");
+ALTER TABLE "messages" ALTER COLUMN "type" TYPE "MessageType_new"
+USING (lower("type"::text)::"MessageType_new");
 ALTER TYPE "MessageType" RENAME TO "MessageType_old";
 ALTER TYPE "MessageType_new" RENAME TO "MessageType";
 DROP TYPE "public"."MessageType_old";
@@ -69,6 +70,38 @@ ALTER TABLE "notifications" DROP CONSTRAINT "notifications_message_id_fkey";
 -- DropIndex
 DROP INDEX "messages_conversation_id_idx";
 
+-- Older databases used users.full_name. Normalize it before reading sender names.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'full_name'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'users'
+          AND column_name = 'name'
+    ) THEN
+        ALTER TABLE "users" RENAME COLUMN "full_name" TO "name";
+    END IF;
+END
+$$;
+ALTER TABLE "users" ALTER COLUMN "name" TYPE VARCHAR(60);
+
+-- Backfill the required sender name before changing sender IDs to text.
+ALTER TABLE "messages" ADD COLUMN "sender_name" TEXT;
+UPDATE "messages" AS m
+SET "sender_name" = COALESCE(u."name", 'Unknown')
+FROM "users" AS u
+WHERE m."sender_id" = u."id";
+UPDATE "messages"
+SET "sender_name" = 'System'
+WHERE "sender_name" IS NULL;
+
 -- AlterTable
 ALTER TABLE "messages" DROP CONSTRAINT "messages_pkey",
 DROP COLUMN "deleted_at",
@@ -78,11 +111,11 @@ DROP COLUMN "updated_at",
 ADD COLUMN     "deleted" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN     "edited_at" TIMESTAMP(3),
 ADD COLUMN     "reply_to_id" TEXT,
-ADD COLUMN     "sender_name" TEXT NOT NULL,
+ALTER COLUMN "sender_name" SET NOT NULL,
 ALTER COLUMN "id" DROP DEFAULT,
-ALTER COLUMN "id" SET DATA TYPE TEXT,
-ALTER COLUMN "conversation_id" SET DATA TYPE TEXT,
-ALTER COLUMN "sender_id" SET DATA TYPE TEXT,
+ALTER COLUMN "id" SET DATA TYPE TEXT USING "id"::TEXT,
+ALTER COLUMN "conversation_id" SET DATA TYPE TEXT USING "conversation_id"::TEXT,
+ALTER COLUMN "sender_id" SET DATA TYPE TEXT USING "sender_id"::TEXT,
 ALTER COLUMN "type" SET DEFAULT 'text',
 ALTER COLUMN "content" SET NOT NULL,
 ADD CONSTRAINT "messages_pkey" PRIMARY KEY ("id");

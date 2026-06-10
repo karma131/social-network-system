@@ -3,8 +3,6 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-// First admin account. Created idempotently (upsert by email) so re-running
-// the seed never duplicates it. Change the password after first login.
 const ADMIN_EMAIL = 'admin@gmail.com';
 const ADMIN_PASSWORD = 'adminadmin';
 const ADMIN_NAME = 'Admin';
@@ -32,10 +30,10 @@ async function main() {
 }
 
 main()
-  .catch((e) => {
-    console.error(e);
+  .catch((error) => {
+    console.error(error);
     process.exit(1);
   })
-  .finally(() => {
-    void prisma.$disconnect();
+  .finally(async () => {
+    await prisma.$disconnect();
   });

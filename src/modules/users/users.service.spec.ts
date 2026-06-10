@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CloudinaryService } from '../uploads/cloudinary.service';
 import { UsersService } from './users.service';
 
 describe('UsersService', () => {
@@ -13,6 +14,9 @@ describe('UsersService', () => {
       count: jest.Mock;
       update: jest.Mock;
     };
+  };
+  let cloudinaryService: {
+    uploadFile: jest.Mock;
   };
 
   const privateUser = {
@@ -40,8 +44,14 @@ describe('UsersService', () => {
         update: jest.fn(),
       },
     };
+    cloudinaryService = {
+      uploadFile: jest.fn(),
+    };
 
-    service = new UsersService(prisma as unknown as PrismaService);
+    service = new UsersService(
+      prisma as unknown as PrismaService,
+      cloudinaryService as unknown as CloudinaryService,
+    );
   });
 
   it('should be defined', () => {
@@ -50,7 +60,11 @@ describe('UsersService', () => {
 
   it('should get current user profile without passwordHash', async () => {
     prisma.user.findUnique
-      .mockResolvedValueOnce({ id: BigInt(1), status: UserStatus.ACTIVE, deletedAt: null })
+      .mockResolvedValueOnce({
+        id: BigInt(1),
+        status: UserStatus.ACTIVE,
+        deletedAt: null,
+      })
       .mockResolvedValueOnce(privateUser);
 
     const result = await service.getMyProfile('1');
@@ -102,21 +116,28 @@ describe('UsersService', () => {
     });
     prisma.user.update.mockResolvedValue({
       ...privateUser,
-      avatarUrl: '/uploads/avatar.jpg',
+      avatarUrl: 'https://res.cloudinary.com/demo/image/upload/avatar.jpg',
+    });
+    cloudinaryService.uploadFile.mockResolvedValue({
+      secure_url: 'https://res.cloudinary.com/demo/image/upload/avatar.jpg',
     });
 
-    const result = await service.updateAvatar(
-      '1',
-      {},
-      { filename: 'avatar.jpg' } as Express.Multer.File,
-    );
+    const result = await service.updateAvatar('1', {}, {
+      originalname: 'avatar.jpg',
+      buffer: Buffer.from('avatar'),
+    } as Express.Multer.File);
 
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: BigInt(1) },
-      data: { avatarUrl: '/uploads/avatar.jpg' },
+      data: {
+        avatarUrl: 'https://res.cloudinary.com/demo/image/upload/avatar.jpg',
+      },
       select: expect.any(Object),
     });
-    expect(result.user.avatarUrl).toBe('/uploads/avatar.jpg');
+    expect(cloudinaryService.uploadFile).toHaveBeenCalled();
+    expect(result.user.avatarUrl).toBe(
+      'https://res.cloudinary.com/demo/image/upload/avatar.jpg',
+    );
   });
 
   it('should update cover from url', async () => {
