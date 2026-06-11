@@ -23,7 +23,7 @@ import type { Request } from 'express';
 import { UploadType } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
-import { multerDiskStorage } from '../uploads/multer.config';
+import { multerCloudinaryOptions } from '../uploads/multer.config';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
@@ -71,7 +71,7 @@ export class PostsController {
   @HttpPost('upload')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: multerDiskStorage,
+      ...multerCloudinaryOptions,
       limits: { fileSize: 50 * 1024 * 1024 },
     }),
   )
@@ -84,11 +84,10 @@ export class PostsController {
       file,
       UploadType.POST_IMAGE,
     );
-    const base = `${req.protocol}://${req.get('host')}`;
     // Return just { url } so TransformInterceptor wraps it as data:{ url } —
     // the FE proxy reads body.data.url. (A `message` key would make the
     // interceptor treat the url string itself as `data`.)
-    return { url: `${base}${upload.fileUrl}` };
+    return { url: upload.fileUrl };
   }
 
   @ApiBearerAuth('access-token')
