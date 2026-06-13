@@ -36,6 +36,8 @@ model User {
   friendsReceived       Friend[]       @relation("FriendAddressee")
   notificationsReceived Notification[] @relation("NotificationUser")
   notificationsActed    Notification[] @relation("NotificationActor")
+  chatGroupsCreated     ChatGroup[]     @relation("ChatGroupCreator")
+  chatGroupMemberships  ChatGroupMember[]
 
   adminLogs AdminLog[]
 
@@ -257,6 +259,36 @@ model Message {
   @@index([conversationId, createdAt])
   @@index([senderId])
   @@map("messages")
+}
+
+model ChatGroup {
+  id        String   @id
+  name      String   @db.VarChar(120)
+  createdBy BigInt   @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  creator User              @relation("ChatGroupCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  members ChatGroupMember[]
+
+  @@index([createdBy])
+  @@map("chat_groups")
+}
+
+model ChatGroupMember {
+  groupId   String   @map("group_id")
+  userId    BigInt   @map("user_id")
+  isAdmin   Boolean  @default(false) @map("is_admin")
+  isMuted   Boolean  @default(false) @map("is_muted")
+  isBlocked Boolean  @default(false) @map("is_blocked")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  group ChatGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, userId])
+  @@index([userId])
+  @@map("chat_group_members")
 }
 
 model Hashtag {
