@@ -125,14 +125,25 @@ export class ChatsService {
     conversationId: string,
     viewerId: string,
     cursor: number | undefined,
+    cursorId: string | undefined,
     limit: number,
   ): Promise<ChatHistoryResponseDTO> {
     this.assertCanRead(conversationId, viewerId);
 
+    const cursorDate = cursor ? new Date(cursor) : undefined;
     const rows = await this.prisma.message.findMany({
       where: {
         conversationId,
-        ...(cursor ? { createdAt: { lt: new Date(cursor) } } : {}),
+        ...(cursorDate
+          ? {
+              OR: [
+                { createdAt: { lt: cursorDate } },
+                ...(cursorId
+                  ? [{ createdAt: cursorDate, id: { lt: cursorId } }]
+                  : []),
+              ],
+            }
+          : {}),
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -146,6 +157,7 @@ export class ChatsService {
       messages,
       nextCurosr:
         hasMore && page.length ? page[0].createdAt.getTime() : null,
+      nextCursorId: hasMore && page.length ? page[0].id : null,
       hasMore,
     };
   }

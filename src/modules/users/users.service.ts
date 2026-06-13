@@ -36,6 +36,14 @@ const PUBLIC_USER_SELECT = {
   avatarUrl: true,
   coverUrl: true,
   bio: true,
+  profile: {
+    select: {
+      location: true,
+      work: true,
+      education: true,
+      relationship: true,
+    },
+  },
 } as const;
 
 @Injectable()
@@ -299,9 +307,10 @@ export class UsersService {
   }
 
   async getPublicProfile(userId: string) {
+    const id = BigInt(userId);
     const user = await this.prisma.user.findFirst({
       where: {
-        id: BigInt(userId),
+        id,
         deletedAt: null,
         status: {
           notIn: [UserStatus.BANNED, UserStatus.LOCKED],
@@ -314,9 +323,66 @@ export class UsersService {
       throw new NotFoundException('Khong tim thay nguoi dung');
     }
 
+    const [postStats, friends] = await Promise.all([
+      this.prisma.post.findMany({
+        where: {
+          userId: id,
+          deletedAt: null,
+          status: 'PUBLISHED',
+          visibility: 'PUBLIC',
+        },
+        select: {
+          reactionCount: true,
+          media: { select: { fileType: true } },
+        },
+      }),
+      this.prisma.friend.findMany({
+        where: {
+          status: 'ACCEPTED',
+          OR: [{ requesterId: id }, { addresseeId: id }],
+        },
+        select: {
+          requester: { select: PUBLIC_USER_SELECT },
+          addressee: { select: PUBLIC_USER_SELECT },
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+    ]);
+
+    const publicFriends = friends.map((row) => {
+      const friend = row.requester.id === id ? row.addressee : row.requester;
+      return {
+        id: friend.id.toString(),
+        name: friend.name,
+        avatarUrl: friend.avatarUrl,
+        location: friend.profile?.location ?? '',
+      };
+    });
+
     return {
       message: 'Lay thong tin public cua nguoi dung thanh cong',
-      user: mapPublicUser(user),
+      user: {
+        ...mapPublicUser(user),
+        location: user.profile?.location ?? '',
+        work: user.profile?.work ?? '',
+        education: user.profile?.education ?? '',
+        relationship: user.profile?.relationship ?? '',
+        friends: publicFriends,
+        stats: {
+          posts: postStats.length,
+          friends: publicFriends.length,
+          photos: postStats.filter((post) =>
+            post.media.some((media) => media.fileType === 'image'),
+          ).length,
+          videos: postStats.filter((post) =>
+            post.media.some((media) => media.fileType === 'video'),
+          ).length,
+          likes: postStats.reduce(
+            (total, post) => total + post.reactionCount,
+            0,
+          ),
+        },
+      },
     };
   }
 

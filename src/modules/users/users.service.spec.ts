@@ -14,6 +14,12 @@ describe('UsersService', () => {
       count: jest.Mock;
       update: jest.Mock;
     };
+    post: {
+      findMany: jest.Mock;
+    };
+    friend: {
+      findMany: jest.Mock;
+    };
   };
   let cloudinaryService: {
     uploadFile: jest.Mock;
@@ -42,6 +48,12 @@ describe('UsersService', () => {
         findMany: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
+      },
+      post: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      friend: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
     cloudinaryService = {
@@ -165,7 +177,39 @@ describe('UsersService', () => {
       avatarUrl: null,
       coverUrl: null,
       bio: 'Public bio',
+      profile: {
+        location: 'Ha Noi',
+        work: 'Orbit',
+        education: 'HUST',
+        relationship: 'Single',
+      },
     });
+    prisma.post.findMany.mockResolvedValue([
+      {
+        reactionCount: 3,
+        media: [{ fileType: 'image' }, { fileType: 'video' }],
+      },
+    ]);
+    prisma.friend.findMany.mockResolvedValue([
+      {
+        requester: {
+          id: BigInt(2),
+          name: 'Public User',
+          avatarUrl: null,
+          coverUrl: null,
+          bio: 'Public bio',
+          profile: { location: 'Ha Noi' },
+        },
+        addressee: {
+          id: BigInt(3),
+          name: 'Friend User',
+          avatarUrl: 'friend.jpg',
+          coverUrl: null,
+          bio: null,
+          profile: { location: 'Da Nang' },
+        },
+      },
+    ]);
 
     const result = await service.getPublicProfile('2');
 
@@ -175,6 +219,25 @@ describe('UsersService', () => {
       avatarUrl: null,
       coverUrl: null,
       bio: 'Public bio',
+      location: 'Ha Noi',
+      work: 'Orbit',
+      education: 'HUST',
+      relationship: 'Single',
+      friends: [
+        {
+          id: '3',
+          name: 'Friend User',
+          avatarUrl: 'friend.jpg',
+          location: 'Da Nang',
+        },
+      ],
+      stats: {
+        posts: 1,
+        friends: 1,
+        photos: 1,
+        videos: 1,
+        likes: 3,
+      },
     });
     expect(result.user).not.toHaveProperty('email');
     expect(result.user).not.toHaveProperty('passwordHash');

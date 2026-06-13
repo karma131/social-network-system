@@ -34,5 +34,6 @@ export interface ChatMessageDTO {
 export interface ChatHistoryResponseDTO {
   messages: ChatMessageDTO[];
   nextCurosr: number | null;
+  nextCursorId: string | null;
   hasMore: boolean;
 }
