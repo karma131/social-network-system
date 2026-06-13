@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { Message as MessageRow } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type {
@@ -12,6 +14,8 @@ import type {
   ReactionKey,
   ReplyContextDTO,
 } from './dto/chat-message.dto';
+import type { CreateChatGroupDto } from './dto/create-chat-group.dto';
+import type { SendChatMessageDto } from './dto/send-chat-message.dto';
 
 const SYSTEM_SENDER = 'system';
 const REPLY_SNIPPET_MAX = 140;
@@ -24,7 +28,10 @@ export class ChatsService {
   // sorted lexicographically; only the two participants may read. Groups use
   // `group:<uuid>` and currently have no membership table on this side, so we
   // accept any authed viewer (TODO once GroupMember lands — mirrors target).
-  private assertCanRead(conversationId: string, viewerId: string): void {
+  private async assertCanRead(
+    conversationId: string,
+    viewerId: string,
+  ): Promise<void> {
     if (conversationId.startsWith('dm:')) {
       const [, a, b] = conversationId.split(':');
       if (!a || !b) {
@@ -35,8 +42,130 @@ export class ChatsService {
       }
       return;
     }
-    if (conversationId.startsWith('group:')) return;
+    if (conversationId.startsWith('group:')) {
+      const membership = await this.prisma.chatGroupMember.findUnique({
+        where: {
+          groupId_userId: {
+            groupId: conversationId,
+            userId: BigInt(viewerId),
+          },
+        },
+        select: { userId: true },
+      });
+      if (!membership) throw new ForbiddenException('Not a group member');
+      return;
+    }
     throw new BadRequestException('Unknown conversation kind');
+  }
+
+  private toGroupDto(group: {
+    id: string;
+    name: string;
+    createdBy: bigint;
+    createdAt: Date;
+    members: {
+      userId: bigint;
+      isAdmin: boolean;
+      isMuted: boolean;
+      isBlocked: boolean;
+    }[];
+  }) {
+    return {
+      conversationId: group.id,
+      name: group.name,
+      memberIds: group.members.map((member) => member.userId.toString()),
+      adminIds: group.members
+        .filter((member) => member.isAdmin)
+        .map((member) => member.userId.toString()),
+      mutedMembers: group.members
+        .filter((member) => member.isMuted)
+        .map((member) => member.userId.toString()),
+      blockedMembers: group.members
+        .filter((member) => member.isBlocked)
+        .map((member) => member.userId.toString()),
+      createdAt: group.createdAt.getTime(),
+      createdBy: group.createdBy.toString(),
+    };
+  }
+
+  async createGroup(viewerId: string, dto: CreateChatGroupDto) {
+    const creatorId = BigInt(viewerId);
+    const memberIds = [
+      ...new Set([viewerId, ...dto.memberIds].map((id) => BigInt(id))),
+    ];
+    if (memberIds.length < 3) {
+      throw new BadRequestException('A group needs at least 3 members');
+    }
+
+    const existingUsers = await this.prisma.user.count({
+      where: { id: { in: memberIds }, deletedAt: null },
+    });
+    if (existingUsers !== memberIds.length) {
+      throw new NotFoundException('One or more members do not exist');
+    }
+
+    const group = await this.prisma.chatGroup.create({
+      data: {
+        id: `group:${randomUUID()}`,
+        name: dto.name.trim(),
+        createdBy: creatorId,
+        members: {
+          create: memberIds.map((userId) => ({
+            userId,
+            isAdmin: userId === creatorId,
+          })),
+        },
+      },
+      include: { members: true },
+    });
+    return this.toGroupDto(group);
+  }
+
+  async listGroups(viewerId: string) {
+    const groups = await this.prisma.chatGroup.findMany({
+      where: { members: { some: { userId: BigInt(viewerId) } } },
+      include: { members: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return groups.map((group) => this.toGroupDto(group));
+  }
+
+  async sendGroupMessage(
+    conversationId: string,
+    viewerId: string,
+    dto: SendChatMessageDto,
+  ): Promise<ChatMessageDTO> {
+    if (!conversationId.startsWith('group:')) {
+      throw new BadRequestException('Group conversation required');
+    }
+    await this.assertCanRead(conversationId, viewerId);
+
+    const sender = await this.prisma.user.findUnique({
+      where: { id: BigInt(viewerId) },
+      select: { name: true },
+    });
+    if (!sender) throw new NotFoundException('Sender not found');
+
+    if (dto.replyToId) {
+      const parent = await this.prisma.message.findFirst({
+        where: { id: dto.replyToId, conversationId },
+        select: { id: true },
+      });
+      if (!parent) throw new BadRequestException('Reply message not found');
+    }
+
+    const row = await this.prisma.message.create({
+      data: {
+        conversationId,
+        senderId: viewerId,
+        senderName: sender.name,
+        content: dto.content,
+        type: dto.type ?? 'text',
+        replyToId: dto.replyToId,
+      },
+    });
+    const [message] = await this.hydrate([row]);
+    return message;
   }
 
   private replySnippet(type: string, content: string): string {
@@ -128,7 +257,7 @@ export class ChatsService {
     cursorId: string | undefined,
     limit: number,
   ): Promise<ChatHistoryResponseDTO> {
-    this.assertCanRead(conversationId, viewerId);
+    await this.assertCanRead(conversationId, viewerId);
 
     const cursorDate = cursor ? new Date(cursor) : undefined;
     const rows = await this.prisma.message.findMany({
