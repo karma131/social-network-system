@@ -38,6 +38,7 @@ export class ChatsController {
       conversationId,
       req.user.sub,
       query.cursor,
+      query.cursorId,
       query.limit,
     );
     return { success: true, data };

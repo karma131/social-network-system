@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsPositive, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class ListMessagesQueryDto {
   @IsOptional()
@@ -7,6 +14,10 @@ export class ListMessagesQueryDto {
   @IsInt()
   @IsPositive()
   cursor?: number;
+
+  @IsOptional()
+  @IsString()
+  cursorId?: string;
 
   @IsOptional()
   @Type(() => Number)
