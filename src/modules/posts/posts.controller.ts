@@ -30,6 +30,7 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { ReactPostDto } from './dto/react-post.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { PinPostDto } from './dto/pin-post.dto';
+import { CreateStoryDto } from './dto/create-story.dto';
 import { PostsService } from './posts.service';
 
 type RequestCoUser = Request & {
@@ -88,6 +89,22 @@ export class PostsController {
     // the FE proxy reads body.data.url. (A `message` key would make the
     // interceptor treat the url string itself as `data`.)
     return { url: upload.fileUrl };
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Lay story con hieu luc' })
+  @Get('stories')
+  listStories(@Req() req: RequestMaybeUser) {
+    return this.postsService.listStories(req.user?.sub);
+  }
+
+  @ApiBearerAuth('access-token')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Dang story moi' })
+  @HttpPost('stories')
+  createStory(@Req() req: RequestCoUser, @Body() dto: CreateStoryDto) {
+    return this.postsService.createStory(req.user.sub, dto);
   }
 
   @ApiBearerAuth('access-token')

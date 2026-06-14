@@ -17,6 +17,7 @@ import { extractHashtags } from '../hashtags/util/hashtag-parser';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { CreateStoryDto } from './dto/create-story.dto';
 
 /** Shared select for every post-returning endpoint so they emit one shape. */
 const POST_SELECT = {
@@ -50,6 +51,9 @@ const COMMENT_SELECT = {
 
 type CommentRow = Prisma.CommentGetPayload<{ select: typeof COMMENT_SELECT }>;
 
+const STORY_PREFIX = '__ORBIT_STORY__:';
+const STORY_TTL_MS = 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class PostsService {
   constructor(
@@ -70,6 +74,99 @@ export class PostsService {
     if (videoUrl)
       rows.push({ postId, fileUrl: videoUrl, fileType: 'video', sortOrder: 1 });
     if (rows.length) await tx.postMedia.createMany({ data: rows });
+  }
+
+  private isStoryContent(content: string | null): boolean {
+    return content?.startsWith(STORY_PREFIX) ?? false;
+  }
+
+  private storyPayload(content: string | null): {
+    caption?: string;
+    musicId?: string;
+  } {
+    if (!this.isStoryContent(content)) return {};
+    try {
+      return JSON.parse(content!.slice(STORY_PREFIX.length)) as {
+        caption?: string;
+        musicId?: string;
+      };
+    } catch {
+      return {};
+    }
+  }
+
+  private toStoryDto(post: PostRow) {
+    const image = post.media.find((item) => item.fileType === 'image');
+    const video = post.media.find((item) => item.fileType === 'video');
+    const payload = this.storyPayload(post.content);
+    return {
+      id: post.id.toString(),
+      authorId: post.user.id.toString(),
+      authorName: post.user.name,
+      authorAvatarUrl: post.user.avatarUrl ?? '',
+      mediaUrl: video?.fileUrl ?? image?.fileUrl ?? '',
+      mediaType: video ? ('video' as const) : ('image' as const),
+      caption: payload.caption,
+      musicId: payload.musicId,
+      createdAt: post.createdAt.getTime(),
+      expiresAt: post.createdAt.getTime() + STORY_TTL_MS,
+    };
+  }
+
+  async createStory(userId: string, dto: CreateStoryDto) {
+    const content =
+      STORY_PREFIX +
+      JSON.stringify({
+        ...(dto.caption?.trim() ? { caption: dto.caption.trim() } : {}),
+        ...(dto.musicId ? { musicId: dto.musicId } : {}),
+      });
+
+    const story = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.post.create({
+        data: {
+          userId: BigInt(userId),
+          content,
+          visibility: PostVisibility.PUBLIC,
+          status: PostStatus.PUBLISHED,
+        },
+        select: { id: true },
+      });
+      await this.createMedia(
+        tx,
+        created.id,
+        dto.mediaType === 'image' ? dto.mediaUrl : undefined,
+        dto.mediaType === 'video' ? dto.mediaUrl : undefined,
+      );
+      return tx.post.findUniqueOrThrow({
+        where: { id: created.id },
+        select: POST_SELECT,
+      });
+    });
+
+    return {
+      message: 'Dang story thanh cong',
+      story: this.toStoryDto(story),
+    };
+  }
+
+  async listStories(_viewerId?: string) {
+    const stories = await this.prisma.post.findMany({
+      where: {
+        content: { startsWith: STORY_PREFIX },
+        status: PostStatus.PUBLISHED,
+        deletedAt: null,
+        createdAt: { gte: new Date(Date.now() - STORY_TTL_MS) },
+        visibility: PostVisibility.PUBLIC,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: POST_SELECT,
+    });
+    return {
+      message: 'Lay danh sach story thanh cong',
+      stories: stories
+        .filter((story) => story.user && story.media.length > 0)
+        .map((story) => this.toStoryDto(story)),
+    };
   }
 
   /** Maps a BE post row to the frontend PostDTO contract. */
@@ -204,7 +301,7 @@ export class PostsService {
       // Skip orphan rows (author deleted without cascade) so one bad row can't
       // 500 the whole feed.
       posts: posts
-        .filter((post) => post.user)
+        .filter((post) => post.user && !this.isStoryContent(post.content))
         .map((post) => this.toPostDto(post, viewerId)),
     };
   }
@@ -223,7 +320,9 @@ export class PostsService {
 
     return {
       message: 'Lấy bài viết của tôi thành công',
-      posts: posts.map((post) => this.toPostDto(post, userId)),
+      posts: posts
+        .filter((post) => !this.isStoryContent(post.content))
+        .map((post) => this.toPostDto(post, userId)),
     };
   }
 
