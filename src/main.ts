@@ -17,9 +17,30 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  const configuredOrigins = (process.env.CLIENT_ORIGIN ?? 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  const allowVercelDeployments = configuredOrigins.some((origin) =>
+    origin.endsWith('.vercel.app'),
+  );
+
   app.enableCors({
-    origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:3000',
+    origin(origin, callback) {
+      if (
+        !origin ||
+        configuredOrigins.includes(origin.replace(/\/$/, '')) ||
+        (allowVercelDeployments &&
+          /^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin))
+      ) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS origin not allowed: ${origin}`), false);
+    },
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
   });
 
   app.setGlobalPrefix('api/v1');
