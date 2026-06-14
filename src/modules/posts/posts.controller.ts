@@ -72,7 +72,7 @@ export class PostsController {
   @UseInterceptors(
     FileInterceptor('file', {
       ...multerCloudinaryOptions,
-      limits: { fileSize: 50 * 1024 * 1024 },
+      limits: { fileSize: 100 * 1024 * 1024 },
     }),
   )
   async upload(

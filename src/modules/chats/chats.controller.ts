@@ -1,9 +1,7 @@
 import {
-  Body,
   Controller,
   Get,
   Param,
-  Post,
   Query,
   Req,
   UseGuards,
@@ -12,9 +10,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ChatsService } from './chats.service';
-import { CreateChatGroupDto } from './dto/create-chat-group.dto';
 import { ListMessagesQueryDto } from './dto/list-messages.dto';
-import { SendChatMessageDto } from './dto/send-chat-message.dto';
 
 type RequestCoUser = Request & {
   user: {
@@ -30,29 +26,6 @@ type RequestCoUser = Request & {
 @Controller('chat')
 export class ChatsController {
   constructor(private readonly chatsService: ChatsService) {}
-
-  @Post('groups')
-  createGroup(@Req() req: RequestCoUser, @Body() dto: CreateChatGroupDto) {
-    return this.chatsService.createGroup(req.user.sub, dto);
-  }
-
-  @Get('groups')
-  listGroups(@Req() req: RequestCoUser) {
-    return this.chatsService.listGroups(req.user.sub);
-  }
-
-  @Post(':conversationId/messages')
-  sendMessage(
-    @Param('conversationId') conversationId: string,
-    @Req() req: RequestCoUser,
-    @Body() dto: SendChatMessageDto,
-  ) {
-    return this.chatsService.sendGroupMessage(
-      conversationId,
-      req.user.sub,
-      dto,
-    );
-  }
 
   @ApiOperation({ summary: 'Lay lich su tin nhan (cursor pagination)' })
   @Get(':conversationId/messages')
